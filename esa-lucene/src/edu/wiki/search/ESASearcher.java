@@ -1,22 +1,14 @@
 package edu.wiki.search;
 
-import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.sql.Connection;
-import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
-
-import java.sql.PreparedStatement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -25,6 +17,9 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.analysis.tokenattributes.TermAttribute;
+
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.api.concept.scorer.CosineScorer;
@@ -32,6 +27,8 @@ import edu.wiki.concept.ConceptVectorSimilarity;
 import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.HeapSort;
+import edu.wiki.util.WikiprepESAConfiguration;
+import edu.wiki.util.WikiprepESAdb;
 import gnu.trove.TIntFloatHashMap;
 import gnu.trove.TIntIntHashMap;
 
@@ -77,22 +74,7 @@ public class ESASearcher {
 	ConceptVectorSimilarity sim = new ConceptVectorSimilarity(new CosineScorer());
 		
 	public void initDB() throws ClassNotFoundException, SQLException, IOException {
-		// Load the JDBC driver 
-		String driverName = "com.mysql.jdbc.Driver"; // MySQL Connector 
-		Class.forName(driverName); 
-		
-		// read DB config
-		InputStream is = ESASearcher.class.getResourceAsStream("/config/db.conf");
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
-		String serverName = br.readLine();
-		String mydatabase = br.readLine();
-		String username = br.readLine(); 
-		String password = br.readLine();
-		br.close();
-
-		// Create a connection to the database 
-		String url = "jdbc:mysql://" + serverName + "/" + mydatabase; // a JDBC url 
-		connection = DriverManager.getConnection(url, username, password);
+		connection = WikiprepESAdb.getInstance().getConnection();
 		
 		pstmtQuery = connection.prepareStatement(strTermQuery);
 		pstmtQuery.setFetchSize(1);
@@ -351,7 +333,6 @@ public class ESASearcher {
 		
 		it = cv.orderedIterator();
 		
-		int count = 0;
 		ArrayList<Integer> pages = new ArrayList<Integer>();
 						
 		TIntFloatHashMap valueMap2 = new TIntFloatHashMap(1000);
@@ -368,7 +349,6 @@ public class ESASearcher {
 		while(it.next()){
 			pages.add(it.getId());
 			valueMap2.put(it.getId(),(float) it.getValue());
-			count++;
 		}
 		
 		// prepare inlink counts
@@ -439,18 +419,15 @@ public class ESASearcher {
 		//System.out.println("read links..");
 		
 		
-		ArrayList<Integer> keys = new ArrayList(secondMap.keySet());
+		ArrayList<Integer> keys = new ArrayList<Integer>(secondMap.keySet());
 		
 		//Sort keys by values.
-		final Map langForComp = secondMap;
+		final Map<Integer, Float> langForComp = secondMap;
 		Collections.sort(keys, 
-			new Comparator(){
-				public int compare(Object left, Object right){
-					Integer leftKey = (Integer)left;
-					Integer rightKey = (Integer)right;
-					
-					Float leftValue = (Float)langForComp.get(leftKey);
-					Float rightValue = (Float)langForComp.get(rightKey);
+			new Comparator<Integer>(){
+				public int compare(Integer left, Integer right){
+					Float leftValue = (Float)langForComp.get(left);
+					Float rightValue = (Float)langForComp.get(right);
 					return leftValue.compareTo(rightValue);
 				}
 			});
@@ -473,6 +450,12 @@ public class ESASearcher {
 		return cv_link;
 	}
 	
+	/**
+	 * 
+	 * @param limit				Max number of top scoring concepts to return
+	 * @param secondOrderLimit	When doing 2nd order vector, max number of top
+	 * 							bonus scoring elements to update
+	 */
 	public IConceptVector getCombinedVector(String query) throws IOException, SQLException{
 		IConceptVector cvBase = getConceptVector(query);
 		IConceptVector cvNormal, cvLink;
@@ -480,9 +463,8 @@ public class ESASearcher {
 		if(cvBase == null){
 			return null;
 		}
-		
-		cvNormal = getNormalVector(cvBase,10);
-		cvLink = getLinkVector(cvNormal,5);
+		cvNormal = getNormalVector(cvBase, WikiprepESAConfiguration.getInstance().getIntProperty(WikiprepESAConfiguration.NORMALIZED_VECTOR_SIZE_LIMIT));
+		cvLink = getLinkVector(cvNormal,WikiprepESAConfiguration.getInstance().getIntProperty(WikiprepESAConfiguration.SECOND_ORDER_BONUS_VECTOR_LIMIT));
 		
 		cvNormal.add(cvLink);
 		

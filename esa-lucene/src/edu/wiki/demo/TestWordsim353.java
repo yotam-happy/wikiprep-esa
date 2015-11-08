@@ -1,13 +1,13 @@
 package edu.wiki.demo;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 
-import edu.wiki.modify.IndexModifier;
 import edu.wiki.search.ESASearcher;
 
 public class TestWordsim353 {
@@ -25,8 +25,8 @@ public class TestWordsim353 {
 		DecimalFormat df = new DecimalFormat("#.##########");
 		
 		// read Wordsim-353 human judgements
-		InputStream is = IndexModifier.class.getResourceAsStream("/config/wordsim353-combined.tab");
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
+		FileInputStream fis = new FileInputStream(new File("config/wordsim353-combined.tab"));
+		BufferedReader br = new BufferedReader(new InputStreamReader(fis));
 		br.readLine(); //skip first line
 		System.out.println("Word 1\tWord 2\tHuman (mean)\tScore");
 		while((line = br.readLine()) != null){

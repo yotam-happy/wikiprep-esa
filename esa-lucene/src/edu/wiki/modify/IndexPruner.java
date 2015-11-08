@@ -1,16 +1,14 @@
 package edu.wiki.modify;
 
-import java.io.BufferedReader;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+
+import edu.wiki.util.WikiprepESAdb;
 
 /**
  * Performs pruning on the index with a sliding window,
@@ -39,22 +37,7 @@ public class IndexPruner {
 	static int PARALEL_TERM = 3;
 	
 	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
-		// Load the JDBC driver 
-		String driverName = "com.mysql.jdbc.Driver"; // MySQL Connector 
-		Class.forName(driverName); 
-		
-		// read DB config
-		InputStream is = IndexPruner.class.getResourceAsStream("/config/db.conf");
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
-		String serverName = br.readLine();
-		String mydatabase = br.readLine();
-		String username = br.readLine(); 
-		String password = br.readLine();
-		br.close();
-
-		// Create a connection to the database 
-		String url = "jdbc:mysql://" + serverName + "/" + mydatabase + "?useUnicode=yes&characterEncoding=UTF-8"; // a JDBC url 
-		connection = DriverManager.getConnection(url, username, password);
+		connection = WikiprepESAdb.getInstance().getConnection();
 		
 		pstmtTerm = connection.createStatement();
 		pstmtTerm.setFetchSize(2000);

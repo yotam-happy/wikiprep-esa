@@ -1,13 +1,10 @@
 package edu.wiki.index;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Blob;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -18,6 +15,8 @@ import org.apache.lucene.document.Field;
 import org.apache.lucene.index.IndexWriter;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
+
+import edu.wiki.util.WikiprepESAdb;
 
 /**
  * Performs indexing with Lucene.
@@ -45,22 +44,7 @@ public class ESAWikipediaIndexer {
 	  int addCount = 0;
 	  
 	  public static void initDB() throws ClassNotFoundException, SQLException, IOException {
-			// Load the JDBC driver 
-			String driverName = "com.mysql.jdbc.Driver"; // MySQL Connector 
-			Class.forName(driverName); 
-			
-			// read DB config
-			InputStream is = ESAWikipediaIndexer.class.getResourceAsStream("/config/db.conf");
-			BufferedReader br = new BufferedReader(new InputStreamReader(is));
-			String serverName = br.readLine();
-			String mydatabase = br.readLine();
-			String username = br.readLine(); 
-			String password = br.readLine();
-			br.close();
-
-			// Create a connection to the database 
-			String url = "jdbc:mysql://" + serverName + "/" + mydatabase; // a JDBC url 
-			connection = DriverManager.getConnection(url, username, password);
+			connection = WikiprepESAdb.getInstance().getConnection();
 			
 			pstmt = connection.prepareStatement(strArticleQuery);
 			pstmt.setFetchSize(200);
@@ -90,6 +74,7 @@ public class ESAWikipediaIndexer {
 	      indexer = new ESAWikipediaIndexer(fsdir);
 	    } catch (Exception ex) {
 	      System.out.println("Cannot create index..." + ex.getMessage());
+	      ex.printStackTrace();
 	      System.exit(-1);
 	    }
 

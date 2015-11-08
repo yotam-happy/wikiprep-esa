@@ -2,10 +2,8 @@ package edu.wiki.demo;
 
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -14,6 +12,7 @@ import java.util.HashMap;
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESASearcher;
+import edu.wiki.util.WikiprepESAdb;
 
 public class TestESAVectors {
 	
@@ -23,23 +22,7 @@ public class TestESAVectors {
 	static String strTitles = "SELECT id,title FROM article WHERE id IN ";
 	
 	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
-		// Load the JDBC driver 
-		String driverName = "com.mysql.jdbc.Driver"; // MySQL Connector 
-		Class.forName(driverName); 
-		
-		// read DB config
-		InputStream is = ESASearcher.class.getResourceAsStream("/config/db.conf");
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
-		String serverName = br.readLine();
-		String mydatabase = br.readLine();
-		String username = br.readLine(); 
-		String password = br.readLine();
-		br.close();
-
-		// Create a connection to the database 
-		String url = "jdbc:mysql://" + serverName + "/" + mydatabase; // a JDBC url 
-		connection = DriverManager.getConnection(url, username, password);
-		
+		connection = WikiprepESAdb.getInstance().getConnection();
 		stmtQuery = connection.createStatement();
 		stmtQuery.setFetchSize(100);
 

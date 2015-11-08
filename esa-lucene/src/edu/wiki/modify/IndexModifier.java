@@ -1,6 +1,7 @@
 package edu.wiki.modify;
 
 import edu.wiki.util.HeapSort;
+import edu.wiki.util.WikiprepESAdb;
 import gnu.trove.TIntDoubleHashMap;
 import gnu.trove.TIntFloatHashMap;
 
@@ -12,11 +13,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -69,22 +69,7 @@ public class IndexModifier {
 	static DecimalFormat df = new DecimalFormat("#.########");
 		
 	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
-		// Load the JDBC driver 
-		String driverName = "com.mysql.jdbc.Driver"; // MySQL Connector 
-		Class.forName(driverName); 
-		
-		// read DB config
-		InputStream is = IndexModifier.class.getResourceAsStream("/config/db.conf");
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
-		String serverName = br.readLine();
-		String mydatabase = br.readLine();
-		String username = br.readLine(); 
-		String password = br.readLine();
-		br.close();
-
-		// Create a connection to the database 
-		String url = "jdbc:mysql://" + serverName + "/" + mydatabase + "?useUnicode=yes&characterEncoding=UTF-8"; // a JDBC url 
-		connection = DriverManager.getConnection(url, username, password);
+		connection = WikiprepESAdb.getInstance().getConnection();
 		
 		stmtLink = connection.createStatement();
 		stmtLink.setFetchSize(200);

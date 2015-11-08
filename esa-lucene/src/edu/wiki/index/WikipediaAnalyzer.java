@@ -1,8 +1,9 @@
 package edu.wiki.index;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
@@ -13,7 +14,6 @@ import org.apache.lucene.analysis.CharArraySet;
 import org.apache.lucene.analysis.CustomFilter;
 import org.apache.lucene.analysis.CustomTokenizer;
 import org.apache.lucene.analysis.LengthFilter;
-import org.apache.lucene.analysis.LetterTokenizer;
 import org.apache.lucene.analysis.LowerCaseFilter;
 import org.apache.lucene.analysis.PorterStemFilter;
 import org.apache.lucene.analysis.StopFilter;
@@ -30,8 +30,8 @@ public class WikipediaAnalyzer extends Analyzer {
 	
 	public WikipediaAnalyzer() throws IOException {
 		// read stop words
-		InputStream is = ESAWikipediaIndexer.class.getResourceAsStream("/config/stopwords.txt");
-		BufferedReader br = new BufferedReader(new InputStreamReader(is));
+		FileInputStream fis = new FileInputStream(new File("config/stopwords.txt"));
+		BufferedReader br = new BufferedReader(new InputStreamReader(fis));
 		ArrayList<String> stopWords = new ArrayList<String>(500);
 		
 		String line;
