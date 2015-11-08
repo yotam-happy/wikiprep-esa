@@ -15,7 +15,9 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Map.Entry;
 
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
@@ -29,6 +31,8 @@ import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.HeapSort;
 import edu.wiki.util.WikiprepESAConfiguration;
 import edu.wiki.util.WikiprepESAdb;
+import edu.wiki.util.db.IdfQueryOptimizer;
+import edu.wiki.util.db.TermQueryOptimizer;
 import gnu.trove.TIntFloatHashMap;
 import gnu.trove.TIntIntHashMap;
 
@@ -40,15 +44,10 @@ import gnu.trove.TIntIntHashMap;
 public class ESASearcher {
 	Connection connection;
 	
-	PreparedStatement pstmtQuery;
-	PreparedStatement pstmtIdfQuery;
 	PreparedStatement pstmtLinks;
 	Statement stmtInlink;
 	
 	WikipediaAnalyzer analyzer;
-	
-	String strTermQuery = "SELECT t.vector FROM idx t WHERE t.term = ?";
-	String strIdfQuery = "SELECT t.idf FROM terms t WHERE t.term = ?";
 	
 	String strMaxConcept = "SELECT MAX(id) FROM article";
 	
@@ -63,7 +62,6 @@ public class ESASearcher {
 	
 	HashMap<String, Integer> freqMap = new HashMap<String, Integer>(30);
 	HashMap<String, Double> tfidfMap = new HashMap<String, Double>(30);
-	HashMap<String, Float> idfMap = new HashMap<String, Float>(30);
 	
 	ArrayList<String> termList = new ArrayList<String>(30);
 	
@@ -75,12 +73,6 @@ public class ESASearcher {
 		
 	public void initDB() throws ClassNotFoundException, SQLException, IOException {
 		connection = WikiprepESAdb.getInstance().getConnection();
-		
-		pstmtQuery = connection.prepareStatement(strTermQuery);
-		pstmtQuery.setFetchSize(1);
-		
-		pstmtIdfQuery = connection.prepareStatement(strIdfQuery);
-		pstmtIdfQuery.setFetchSize(1);
 		
 		pstmtLinks = connection.prepareStatement(strLinks);
 		pstmtLinks.setFetchSize(500);
@@ -96,7 +88,6 @@ public class ESASearcher {
 	public void clean(){
 		freqMap.clear();
 		tfidfMap.clear();
-		idfMap.clear();
 		termList.clear();
 		inlinkMap.clear();
 		
@@ -130,7 +121,6 @@ public class ESASearcher {
 	public IConceptVector getConceptVector(String query) throws IOException, SQLException{
 		String strTerm;
 		int numTerms = 0;
-		ResultSet rs;
 		int doc;
 		double score;
 		int vint;
@@ -155,17 +145,6 @@ public class ESASearcher {
             TermAttribute t = ts.getAttribute(TermAttribute.class);
             strTerm = t.term();
             
-            // record term IDF
-            if(!idfMap.containsKey(strTerm)){
-	            pstmtIdfQuery.setBytes(1, strTerm.getBytes("UTF-8"));
-	            pstmtIdfQuery.execute();
-	            
-	            rs = pstmtIdfQuery.getResultSet();
-	            if(rs.next()){
-	            	idfMap.put(strTerm, rs.getFloat(1));	          	  
-	            }
-            }
-            
             // records term counts for TF
             if(freqMap.containsKey(strTerm)){
             	vint = freqMap.get(strTerm);
@@ -187,7 +166,10 @@ public class ESASearcher {
         if(numTerms == 0){
         	return null;
         }
-        
+
+    	Map<String, Float> idfMap = IdfQueryOptimizer.getInstance()
+    			.doQuery(new HashSet<String>(termList));
+
         // calculate TF-IDF vector (normalized)
         vsum = 0;
         for(String tk : idfMap.keySet()){
@@ -206,35 +188,29 @@ public class ESASearcher {
         }
         
         score = 0;
-        for (String tk : termList) { 
+        Map<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
+        		.doQuery(new HashSet<String>(termList));
+        for (Entry<String, byte[]> entry : termVectors.entrySet()) { 
         	            
-            pstmtQuery.setBytes(1, tk.getBytes("UTF-8"));
-            pstmtQuery.execute();
-            
-            rs = pstmtQuery.getResultSet();
-            
-            if(rs.next()){
-          	  bais = new ByteArrayInputStream(rs.getBytes(1));
-          	  dis = new DataInputStream(bais);
-          	  
-          	  /**
-          	   * 4 bytes: int - length of array
-          	   * 4 byte (doc) - 8 byte (tfidf) pairs
-          	   */
-          	  
-          	  plen = dis.readInt();
-          	  // System.out.println("vector len: " + plen);
-          	  for(int k = 0;k<plen;k++){
-          		  doc = dis.readInt();
-          		  score = dis.readFloat();
-          		  values[doc] += score * tfidfMap.get(tk);
-          	  }
-          	  
-          	  bais.close();
-          	  dis.close();
-            }
-
-        }
+        	bais = new ByteArrayInputStream(entry.getValue());
+        	dis = new DataInputStream(bais);
+  
+        	/**
+			 * 4 bytes: int - length of array
+			 * 4 byte (doc) - 8 byte (tfidf) pairs
+			 */
+			  
+			plen = dis.readInt();
+			// System.out.println("vector len: " + plen);
+			for(int k = 0;k<plen;k++){
+				doc = dis.readInt();
+				score = dis.readFloat();
+				values[doc] += score * tfidfMap.get(entry.getKey());
+			}
+  
+			bais.close();
+			dis.close();
+    	}
         
         // no result
         if(score == 0){

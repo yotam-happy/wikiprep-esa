@@ -29,9 +29,13 @@ public class WikiprepESAdb {
 		connection = DriverManager.getConnection(url, username, password);
 	}
 	
-	public static synchronized WikiprepESAdb getInstance() throws ClassNotFoundException, SQLException, FileNotFoundException, IOException {
+	public static synchronized WikiprepESAdb getInstance() {
 		if (wikiprepESAdb == null) {
-			wikiprepESAdb = new WikiprepESAdb();
+			try {
+				wikiprepESAdb = new WikiprepESAdb();
+			} catch (ClassNotFoundException | SQLException | IOException e) {
+				throw new RuntimeException(e);
+			}
 		}
 		return wikiprepESAdb;
 	}
