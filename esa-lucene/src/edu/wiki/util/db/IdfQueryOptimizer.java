@@ -33,7 +33,7 @@ public class IdfQueryOptimizer extends AbstractDBQueryOptimizer<String, Float> {
 	}
 
 	@Override
-	protected Float getValueFromRs(ResultSet rs) {
+	protected Float getValueFromRs(ResultSet rs, Float oldValue) {
 		try {
 			return rs.getFloat(2);
 		} catch (SQLException e) {

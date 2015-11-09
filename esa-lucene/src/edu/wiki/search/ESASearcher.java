@@ -4,20 +4,15 @@ import java.io.ByteArrayInputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.StringReader;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
@@ -28,13 +23,12 @@ import edu.wiki.api.concept.scorer.CosineScorer;
 import edu.wiki.concept.ConceptVectorSimilarity;
 import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
-import edu.wiki.util.HeapSort;
 import edu.wiki.util.WikiprepESAConfiguration;
-import edu.wiki.util.WikiprepESAdb;
 import edu.wiki.util.db.IdfQueryOptimizer;
+import edu.wiki.util.db.InlinkQueryOptimizer;
+import edu.wiki.util.db.LinkTargetsQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
 import gnu.trove.TIntFloatHashMap;
-import gnu.trove.TIntIntHashMap;
 
 /**
  * Performs search on the index located in database.
@@ -42,72 +36,29 @@ import gnu.trove.TIntIntHashMap;
  * @author Cagatay Calli <ccalli@gmail.com>
  */
 public class ESASearcher {
-	Connection connection;
-	
-	PreparedStatement pstmtLinks;
-	Statement stmtInlink;
-	
 	WikipediaAnalyzer analyzer;
-	
-	String strMaxConcept = "SELECT MAX(id) FROM article";
-	
-	String strInlinks = "SELECT i.target_id, i.inlink FROM inlinks i WHERE i.target_id IN ";
-	
-	String strLinks = "SELECT target_id FROM pagelinks WHERE source_id = ?";
-
-	int maxConceptId;
-	
-	int[] ids;
-	double[] values;
 	
 	HashMap<String, Integer> freqMap = new HashMap<String, Integer>(30);
 	HashMap<String, Double> tfidfMap = new HashMap<String, Double>(30);
 	
 	ArrayList<String> termList = new ArrayList<String>(30);
 	
-	TIntIntHashMap inlinkMap;
-	
 	static float LINK_ALPHA = 0.5f;
 	
 	ConceptVectorSimilarity sim = new ConceptVectorSimilarity(new CosineScorer());
 		
-	public void initDB() throws ClassNotFoundException, SQLException, IOException {
-		connection = WikiprepESAdb.getInstance().getConnection();
-		
-		pstmtLinks = connection.prepareStatement(strLinks);
-		pstmtLinks.setFetchSize(500);
-		
-		stmtInlink = connection.createStatement();
-		stmtInlink.setFetchSize(50);
-		
-		ResultSet res = connection.createStatement().executeQuery(strMaxConcept);
-		res.next();
-		maxConceptId = res.getInt(1) + 1;
-  }
-	
 	public void clean(){
 		freqMap.clear();
 		tfidfMap.clear();
 		termList.clear();
-		inlinkMap.clear();
-		
-		Arrays.fill(ids, 0);
-		Arrays.fill(values, 0);
 	}
 	
-	public ESASearcher() throws ClassNotFoundException, SQLException, IOException{
-		initDB();
+	public ESASearcher() throws ClassNotFoundException, IOException{
 		analyzer = new WikipediaAnalyzer();
-		
-		ids = new int[maxConceptId];
-		values = new double[maxConceptId];
-		
-		inlinkMap = new TIntIntHashMap(300);
 	}
 	
 	@Override
 	protected void finalize() throws Throwable {
-        connection.close();
 		super.finalize();
 	}
 	
@@ -118,7 +69,7 @@ public class ESASearcher {
 	 * @throws IOException
 	 * @throws SQLException
 	 */
-	public IConceptVector getConceptVector(String query) throws IOException, SQLException{
+	public IConceptVector getConceptVector(String query) throws IOException{
 		String strTerm;
 		int numTerms = 0;
 		int doc;
@@ -134,10 +85,6 @@ public class ESASearcher {
 
         this.clean();
 
-		for( int i=0; i<ids.length; i++ ) {
-			ids[i] = i;
-		}
-        
         ts.reset();
         
         while (ts.incrementToken()) { 
@@ -186,7 +133,9 @@ public class ESASearcher {
         	vdouble = tfidfMap.get(tk);
         	tfidfMap.put(tk, vdouble / vsum);
         }
-        
+       
+        Map<Integer, Double> result = new HashMap<Integer, Double>();  
+
         score = 0;
         Map<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
         		.doQuery(new HashSet<String>(termList));
@@ -204,8 +153,12 @@ public class ESASearcher {
 			// System.out.println("vector len: " + plen);
 			for(int k = 0;k<plen;k++){
 				doc = dis.readInt();
-				score = dis.readFloat();
-				values[doc] += score * tfidfMap.get(entry.getKey());
+				score = dis.readFloat() * tfidfMap.get(entry.getKey());
+				Double curr = result.get(doc);
+				if (curr != null) {
+					score += curr;
+				}
+				result.put(doc, score);
 			}
   
 			bais.close();
@@ -216,17 +169,24 @@ public class ESASearcher {
         if(score == 0){
         	return null;
         }
+
         
-        HeapSort.heapSort( values, ids );
-        
-        IConceptVector newCv = new TroveConceptVector(ids.length);
-		for( int i=ids.length-1; i>=0 && values[i] > 0; i-- ) {
-			newCv.set( ids[i], values[i] / numTerms );
+        IConceptVector newCv = new TroveConceptVector(result.size());
+		for( Entry<Integer, Double> e : result.entrySet()) {
+			newCv.set( e.getKey(), e.getValue() / numTerms );
 		}
 		
 		return newCv;
 	}
 	
+	public IConceptVector getNormalVector(String query) throws IOException {
+		IConceptVector cvBase = getConceptVector(query);
+		
+		if(cvBase == null){
+			return null;
+		}
+		return getNormalVector(cvBase, WikiprepESAConfiguration.getInstance().getIntProperty(WikiprepESAConfiguration.NORMALIZED_VECTOR_SIZE_LIMIT));
+	}
 	
 	/**
 	 * Returns trimmed form of concept vector
@@ -252,41 +212,7 @@ public class ESASearcher {
 		return cv_normal;
 	}
 	
-	private TIntIntHashMap setInlinkCounts(Collection<Integer> ids) throws SQLException{
-		inlinkMap.clear();
-		
-		String inPart = "(";
-		
-		for(int id: ids){
-			inPart += id + ",";
-		}
-		
-		inPart = inPart.substring(0,inPart.length()-1) + ")";
-
-		// collect inlink counts
-		ResultSet r = stmtInlink.executeQuery(strInlinks + inPart);
-		while(r.next()){
-			inlinkMap.put(r.getInt(1), r.getInt(2)); 
-		}
-		
-		return inlinkMap;
-	}
-	
-	private Collection<Integer> getLinks(int id) throws SQLException{
-		ArrayList<Integer> links = new ArrayList<Integer>(100); 
-		
-		pstmtLinks.setInt(1, id);
-		
-		ResultSet r = pstmtLinks.executeQuery();
-		while(r.next()){
-			links.add(r.getInt(1)); 
-		}
-		
-		return links;
-	}
-	
-	
-	public IConceptVector getLinkVector(IConceptVector cv, int limit) throws SQLException {
+	public IConceptVector getLinkVector(IConceptVector cv, int limit) {
 		if(cv == null)
 			return null;
 		return getLinkVector(cv, true, LINK_ALPHA, limit);
@@ -301,7 +227,7 @@ public class ESASearcher {
 	 * @return
 	 * @throws SQLException
 	 */
-	public IConceptVector getLinkVector(IConceptVector cv, boolean moreGeneral, double ALPHA, int LIMIT) throws SQLException {
+	public IConceptVector getLinkVector(IConceptVector cv, boolean moreGeneral, double ALPHA, int LIMIT) {
 		IConceptIterator it;
 		
 		if(cv == null)
@@ -328,23 +254,27 @@ public class ESASearcher {
 		}
 		
 		// prepare inlink counts
-		setInlinkCounts(pages);
-				
+		Map<Integer, Integer> inlinkCounts = InlinkQueryOptimizer.getInstance()
+				.doQuery(new HashSet<Integer>(pages));
+
+		Map<Integer,Set<Integer>> all_raw_links = LinkTargetsQueryOptimizer.getInstance()
+				.doQuery(new HashSet<Integer>(pages));
 		for(int pid : pages){			
-			Collection<Integer> raw_links = getLinks(pid);
-			if(raw_links.isEmpty()){
+			Set<Integer> raw_links = all_raw_links.get(pid);
+			if(raw_links == null || raw_links.isEmpty()){
 				continue;
 			}
 			ArrayList<Integer> links = new ArrayList<Integer>(raw_links.size());
 			
-			final double inlink_factor_p = Math.log(inlinkMap.get(pid));
+			final double inlink_factor_p = Math.log(inlinkCounts.get(pid) == null ? 1 : inlinkCounts.get(pid));
 										
 			float origValue = valueMap2.get(pid);
 			
-			setInlinkCounts(raw_links);
+			Map<Integer, Integer> toLinks = InlinkQueryOptimizer.getInstance()
+					.doQuery(new HashSet<Integer>(raw_links));
 						
 			for(int lid : raw_links){
-				final double inlink_factor_link = Math.log(inlinkMap.get(lid));
+				final double inlink_factor_link = Math.log(toLinks.get(lid) == null ? 1 : toLinks.get(lid));
 				
 				// check concept generality..
 				if(inlink_factor_link - inlink_factor_p > 1){
@@ -358,11 +288,9 @@ public class ESASearcher {
 					npages.add(lid);
 				}
 			}
-						
-			
-			
+
 			float linkedValue = 0.0f;
-									
+
 			for(int lid : links){
 				if(valueMap3.containsKey(lid)){
 					linkedValue = valueMap3.get(lid); 
@@ -411,7 +339,7 @@ public class ESASearcher {
 		
 		
 
-		IConceptVector cv_link = new TroveConceptVector(maxConceptId);
+		IConceptVector cv_link = new TroveConceptVector(keys.size());
 		
 		int c = 0;
 		for(int p : keys){
@@ -432,7 +360,7 @@ public class ESASearcher {
 	 * @param secondOrderLimit	When doing 2nd order vector, max number of top
 	 * 							bonus scoring elements to update
 	 */
-	public IConceptVector getCombinedVector(String query) throws IOException, SQLException{
+	public IConceptVector getCombinedVector(String query) throws IOException {
 		IConceptVector cvBase = getConceptVector(query);
 		IConceptVector cvNormal, cvLink;
 		

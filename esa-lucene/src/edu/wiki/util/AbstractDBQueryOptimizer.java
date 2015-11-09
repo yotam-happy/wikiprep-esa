@@ -59,7 +59,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 * current position.
 	 * not very pretty but seems to be a must because of the way java.sql works
 	 */
-	protected abstract V getValueFromRs(ResultSet rs);
+	protected abstract V getValueFromRs(ResultSet rs, V oldValue);
 
 	/**
 	 * Service method that must be implemented to get value from result set at 
@@ -68,7 +68,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 */
 	protected abstract K getKeyFromRs(ResultSet rs);
 	
-	public Map<K,V> doQuery(Set<K> keys) throws SQLException {
+	public Map<K,V> doQuery(Set<K> keys) {
 		final List<K> toQuery = new ArrayList<K>();
 		final Map<K,V> result = new HashMap<K,V>();
 		
@@ -83,8 +83,6 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 				cache_misses += 1;
 			}
 		}
-		
-		System.out.println("cache hits: " + cache_hits + " cache misses: " + cache_misses);
 		
 		// Do the queries, up to maxSelectGrouping at a time
 		int count = 0;
@@ -107,17 +105,21 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		return result;
 	}
 	
-	private Map<K,V> executePstmt() throws SQLException {
-        Map<K,V> res = new HashMap<K,V>();
-		pstmt.execute();
-        ResultSet rs = pstmt.getResultSet();
-        while(rs.next()) {
-        	V v = getValueFromRs(rs);
-        	K k = getKeyFromRs(rs);
-        	res.put(k, v);
-        	addToCache(k, v);
-        }
-		return res;
+	private Map<K,V> executePstmt() {
+		try {
+	        Map<K,V> res = new HashMap<K,V>();
+			pstmt.execute();
+	        ResultSet rs = pstmt.getResultSet();
+	        while(rs.next()) {
+	        	K k = getKeyFromRs(rs);
+	        	V v = getValueFromRs(rs, res.get(k));
+	        	res.put(k, v);
+	        	addToCache(k, v);
+	        }
+			return res;
+		}catch(SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
 	private void evacuateFromCache() {

@@ -32,7 +32,7 @@ public class TermQueryOptimizer extends AbstractDBQueryOptimizer<String, byte[]>
 	}
 
 	@Override
-	protected byte[] getValueFromRs(ResultSet rs) {
+	protected byte[] getValueFromRs(ResultSet rs, byte[] oldValue) {
 		try {
 			return rs.getBytes(2);
 		} catch (SQLException e) {
