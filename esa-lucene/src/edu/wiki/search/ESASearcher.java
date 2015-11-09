@@ -1,7 +1,5 @@
 package edu.wiki.search;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.StringReader;
 import java.sql.SQLException;
@@ -23,6 +21,7 @@ import edu.wiki.api.concept.scorer.CosineScorer;
 import edu.wiki.concept.ConceptVectorSimilarity;
 import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
+import edu.wiki.util.TermVectorIterator;
 import edu.wiki.util.WikiprepESAConfiguration;
 import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.InlinkQueryOptimizer;
@@ -78,10 +77,7 @@ public class ESASearcher {
 		double vdouble;
 		double tf;
 		double vsum;
-		int plen;
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
-        ByteArrayInputStream bais;
-        DataInputStream dis;
 
         this.clean();
 
@@ -139,30 +135,18 @@ public class ESASearcher {
         score = 0;
         Map<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
         		.doQuery(new HashSet<String>(termList));
+
         for (Entry<String, byte[]> entry : termVectors.entrySet()) { 
-        	            
-        	bais = new ByteArrayInputStream(entry.getValue());
-        	dis = new DataInputStream(bais);
-  
-        	/**
-			 * 4 bytes: int - length of array
-			 * 4 byte (doc) - 8 byte (tfidf) pairs
-			 */
-			  
-			plen = dis.readInt();
-			// System.out.println("vector len: " + plen);
-			for(int k = 0;k<plen;k++){
-				doc = dis.readInt();
-				score = dis.readFloat() * tfidfMap.get(entry.getKey());
+        	TermVectorIterator iter = new TermVectorIterator(entry.getValue());
+        	while (iter.next()) {
+				doc = iter.getConceptId();
+				score = iter.getConceptScore() * tfidfMap.get(entry.getKey());
 				Double curr = result.get(doc);
 				if (curr != null) {
 					score += curr;
 				}
 				result.put(doc, score);
-			}
-  
-			bais.close();
-			dis.close();
+        	}
     	}
         
         // no result
@@ -259,6 +243,7 @@ public class ESASearcher {
 
 		Map<Integer,Set<Integer>> all_raw_links = LinkTargetsQueryOptimizer.getInstance()
 				.doQuery(new HashSet<Integer>(pages));
+		
 		for(int pid : pages){			
 			Set<Integer> raw_links = all_raw_links.get(pid);
 			if(raw_links == null || raw_links.isEmpty()){
@@ -282,7 +267,7 @@ public class ESASearcher {
 				}
 			}
 						
-			for(int lid : links){				
+			for(int lid : links){
 				if(!valueMap2.containsKey(lid)){
 					valueMap2.put(lid, 0.0f);
 					npages.add(lid);
