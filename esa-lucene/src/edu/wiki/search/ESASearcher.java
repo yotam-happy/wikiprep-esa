@@ -5,9 +5,9 @@ import java.io.StringReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -23,11 +23,9 @@ import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.TermVectorIterator;
 import edu.wiki.util.WikiprepESAConfiguration;
+import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
-import edu.wiki.util.db.InlinkQueryOptimizer;
-import edu.wiki.util.db.LinkTargetsQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
-import gnu.trove.TIntFloatHashMap;
 
 /**
  * Performs search on the index located in database.
@@ -199,144 +197,57 @@ public class ESASearcher {
 	public IConceptVector getLinkVector(IConceptVector cv, int limit) {
 		if(cv == null)
 			return null;
-		return getLinkVector(cv, true, LINK_ALPHA, limit);
+		return getLinkVector(cv, LINK_ALPHA, limit);
 	}
 	
-	/**
-	 * Computes secondary interpretation vector of regular features
-	 * @param cv
-	 * @param moreGeneral
-	 * @param ALPHA
-	 * @param LIMIT
-	 * @return
-	 * @throws SQLException
-	 */
-	public IConceptVector getLinkVector(IConceptVector cv, boolean moreGeneral, double ALPHA, int LIMIT) {
-		IConceptIterator it;
-		
+	public IConceptVector getLinkVector(IConceptVector cv, double ALPHA, int LIMIT) {
 		if(cv == null)
 			return null;
+
+		IConceptIterator it = cv.orderedIterator();
+		Set<Integer> ids = new HashSet<Integer>();
+		while(it.next()){
+			ids.add(it.getId());
+		}
+		
+		Map<Integer, byte[]> concept2nd = Concept2ndOrderQueryOptimizer.getInstance()
+				.doQuery(ids);
+		
+		Map<Integer, Double> bonus = new HashMap<Integer, Double>();
 		
 		it = cv.orderedIterator();
-		
-		ArrayList<Integer> pages = new ArrayList<Integer>();
-						
-		TIntFloatHashMap valueMap2 = new TIntFloatHashMap(1000);
-		TIntFloatHashMap valueMap3 = new TIntFloatHashMap();
-		
-		ArrayList<Integer> npages = new ArrayList<Integer>();
-		
-		HashMap<Integer, Float> secondMap = new HashMap<Integer, Float>(1000);
-		
-		
-		this.clean();
-				
-		// collect article objects
 		while(it.next()){
-			pages.add(it.getId());
-			valueMap2.put(it.getId(),(float) it.getValue());
-		}
-		
-		// prepare inlink counts
-		Map<Integer, Integer> inlinkCounts = InlinkQueryOptimizer.getInstance()
-				.doQuery(new HashSet<Integer>(pages));
-
-		Map<Integer,Set<Integer>> all_raw_links = LinkTargetsQueryOptimizer.getInstance()
-				.doQuery(new HashSet<Integer>(pages));
-		
-		for(int pid : pages){			
-			Set<Integer> raw_links = all_raw_links.get(pid);
-			if(raw_links == null || raw_links.isEmpty()){
+			int conceptId = it.getId();
+			double conceptScore = it.getValue();
+			if (!concept2nd.containsKey(conceptId)) {
 				continue;
 			}
-			ArrayList<Integer> links = new ArrayList<Integer>(raw_links.size());
-			
-			final double inlink_factor_p = Math.log(inlinkCounts.get(pid) == null ? 1 : inlinkCounts.get(pid));
-										
-			float origValue = valueMap2.get(pid);
-			
-			Map<Integer, Integer> toLinks = InlinkQueryOptimizer.getInstance()
-					.doQuery(new HashSet<Integer>(raw_links));
-						
-			for(int lid : raw_links){
-				final double inlink_factor_link = Math.log(toLinks.get(lid) == null ? 1 : toLinks.get(lid));
-				
-				// check concept generality..
-				if(inlink_factor_link - inlink_factor_p > 1){
-					links.add(lid);
+			try {
+				TermVectorIterator tvi = new TermVectorIterator(concept2nd.get(conceptId));
+				while(tvi.next()) {
+					int targetId = tvi.getConceptId();
+					bonus.put(targetId, 
+							tvi.getConceptScore() * conceptScore + (bonus.get(targetId) == null ? 0.0 : bonus.get(targetId)));
 				}
+			} catch(IOException e) {
+				throw new RuntimeException(e);
 			}
-						
-			for(int lid : links){
-				if(!valueMap2.containsKey(lid)){
-					valueMap2.put(lid, 0.0f);
-					npages.add(lid);
-				}
-			}
-
-			float linkedValue = 0.0f;
-
-			for(int lid : links){
-				if(valueMap3.containsKey(lid)){
-					linkedValue = valueMap3.get(lid); 
-					linkedValue += origValue;
-					valueMap3.put(lid, linkedValue);
-				}
-				else {
-					valueMap3.put(lid, origValue);
-				}
-			}
-			
 		}
-		
-		
-//		for(int pid : pages){			
-//			if(valueMap3.containsKey(pid)){
-//				secondMap.put(pid, (float) (valueMap2.get(pid) + ALPHA * valueMap3.get(pid)));
-//			}
-//			else {
-//				secondMap.put(pid, (float) (valueMap2.get(pid) ));
-//			}
-//		}
-		
-		for(int pid : npages){			
-			secondMap.put(pid, (float) (ALPHA * valueMap3.get(pid)));
 
-		}
-		
-		
-		//System.out.println("read links..");
-		
-		
-		ArrayList<Integer> keys = new ArrayList<Integer>(secondMap.keySet());
-		
-		//Sort keys by values.
-		final Map<Integer, Float> langForComp = secondMap;
-		Collections.sort(keys, 
-			new Comparator<Integer>(){
-				public int compare(Integer left, Integer right){
-					Float leftValue = (Float)langForComp.get(left);
-					Float rightValue = (Float)langForComp.get(right);
-					return leftValue.compareTo(rightValue);
-				}
-			});
-		Collections.reverse(keys);
-		
-		
-
-		IConceptVector cv_link = new TroveConceptVector(keys.size());
+		IConceptVector linkVector = new TroveConceptVector(bonus.size());
+		List<Entry<Integer,Double>> sortedEntries = new ArrayList<Entry<Integer,Double>>(bonus.entrySet());
+		Collections.sort(sortedEntries, (v1, v2) -> - Double.compare(v1.getValue(), v2.getValue()));
 		
 		int c = 0;
-		for(int p : keys){
-			cv_link.set(p, secondMap.get(p));
+		for(Entry<Integer, Double> e : sortedEntries){
+			linkVector.set(e.getKey(), e.getValue() * ALPHA);
 			c++;
 			if(c >= LIMIT){
 				break;
 			}
 		}
 		
-		
-		return cv_link;
+		return linkVector;
 	}
 	
 	/**
