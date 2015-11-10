@@ -39,6 +39,9 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		// Get k best describing concepts from each context
 		for (String context : contexts) {
 			IConceptVector v = use2ndOrder ? getCombinedVector(context) : getConceptVector(context);
+			if (v == null || v.count() == 0) {
+				continue;
+			}
 			IConceptIterator iter = v.orderedIterator();
 			int k = 5;
 			while (iter.next() && k > 0) {

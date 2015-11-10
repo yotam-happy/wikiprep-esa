@@ -53,4 +53,9 @@ public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Inte
 		}
 	}
 
+	@Override
+	protected String getLoadAllQuery() {
+		return "SELECT i.target_id, i.inlink FROM inlinks i";
+	}
+
 }

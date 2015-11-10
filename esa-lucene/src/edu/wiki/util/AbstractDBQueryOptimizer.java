@@ -67,6 +67,14 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 * not very pretty but seems to be a must because of the way java.sql works
 	 */
 	protected abstract K getKeyFromRs(ResultSet rs);
+
+	/**
+	 * Will be called by loadAll(). If this returns null then loadAll functionality
+	 * is disabled. otherwise this should return the SQL needed to traverse the entire
+	 * underlying data structure so it can be loaded into memory
+	 * @return
+	 */
+	protected abstract String getLoadAllQuery();
 	
 	public Map<K,V> doQuery(Set<K> keys) {
 		final List<K> toQuery = new ArrayList<K>();
@@ -180,5 +188,36 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		}
 		sb.append(q.substring(q.indexOf('?') + 1));
 		return sb.toString();
+	}
+
+	/**
+	 * This method sets cache to unlimited size and
+	 * fills it with the entire table
+	 * @throws SQLException 
+	 */
+	public void loadAll() throws SQLException {
+		if (getLoadAllQuery() == null) {
+			return;
+		}
+		setMaxCachEntries(Integer.MAX_VALUE);
+		cache.clear();
+		PreparedStatement pstmtLoadAll = WikiprepESAdb.getInstance().getConnection()
+				.prepareStatement(getLoadAllQuery());
+		int c = 0;
+		try {
+	        pstmtLoadAll.execute();
+	        ResultSet rs = pstmtLoadAll.getResultSet();
+	        while(rs.next()) {
+	        	K k = getKeyFromRs(rs);
+	        	V v = getValueFromRs(rs, cache.get(k));
+	        	addToCache(k, v);
+		        c ++;
+		        if (c % 10000 == 0) {
+		        	System.out.println("loaded: " + c + " rows");
+		        }
+	        }
+		}catch(SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

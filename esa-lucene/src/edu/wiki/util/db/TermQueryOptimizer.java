@@ -48,4 +48,9 @@ public class TermQueryOptimizer extends AbstractDBQueryOptimizer<String, byte[]>
 			throw new RuntimeException(e);
 		}
 	}
+
+	@Override
+	protected String getLoadAllQuery() {
+		return "SELECT t.term, t.vector FROM idx t";
+	}
 }
