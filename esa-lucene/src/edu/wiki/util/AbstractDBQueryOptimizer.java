@@ -75,7 +75,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		// for keys that are found in cache, get the value
 		// for the others, keep for query
 		for (K key : keys) {
-			if (cache.containsKey(key)) {
+			if (maxCacheEntries != 0 && cache.containsKey(key)) {
 				cache_hits += 1;
 				result.put(key, cache.get(key));
 			} else {
@@ -101,7 +101,6 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 			}
 			result.putAll(executePstmt());
 		}
-
 		return result;
 	}
 	
@@ -123,6 +122,10 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	}
 	
 	private void evacuateFromCache() {
+		// cache is disabled
+		if (maxCacheEntries == 0) {
+			return;
+		}
 		// If cache is full then remove one element.
 		// maybe someday i need to change this ugly little random 
 		// evacuation policy to something more meaningful...
@@ -140,6 +143,9 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		}
 	}
 	private void addToCache(K k, V v) {
+		if (maxCacheEntries == 0) {
+			return;
+		}
 		evacuateFromCache();
 		cache.put(k, v);
 	}
@@ -156,7 +162,11 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	
 	public void setMaxCachEntries(int maxCacheEntries) {
 		this.maxCacheEntries = maxCacheEntries;
-		evacuateFromCache();
+		if (maxCacheEntries == 0) {
+			cache.clear();
+		} else {
+			evacuateFromCache();
+		}
 	}
 	
 	private static String expandQuery(String q, int k) {

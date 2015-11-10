@@ -10,12 +10,12 @@ import java.io.IOException;
  * 4 byte (doc) - 8 byte (tfidf) pairs
  */
 public class TermVectorIterator {
-    ByteArrayInputStream bais;
-    DataInputStream dis;
-    int vectorLen;
-    int curr = -1;
-    int currConceptId;
-    float currConceptScore;
+    private ByteArrayInputStream bais;
+    private DataInputStream dis;
+    private int vectorLen;
+    private int next = 0;
+    private int currConceptId;
+    private float currConceptScore;
     
     public TermVectorIterator(byte[] vector) throws IOException {
     	bais = new ByteArrayInputStream(vector);
@@ -24,12 +24,12 @@ public class TermVectorIterator {
 	}
     
     public boolean next() throws IOException {
-    	if (curr >= vectorLen) {
+    	if (next >= vectorLen) {
     		return false;
     	}
     	currConceptId = dis.readInt();
     	currConceptScore = dis.readFloat();
-    	curr++;
+    	next++;
     	return true;
     }
     
