@@ -1,5 +1,7 @@
 package edu.wiki.util;
 
+import gnu.trove.THashMap;
+
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.sql.PreparedStatement;
@@ -41,7 +43,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 * @throws ClassNotFoundException 
 	 */
 	public AbstractDBQueryOptimizer(String query) {
-		cache = new HashMap<K,V>();
+		cache = new THashMap<K,V>();
 		this.query = query;
 		// initializes pstmt
 		setMaxSelectGrouping(maxSelectGrouping);
@@ -201,22 +203,23 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		cache.clear();
 		PreparedStatement pstmtLoadAll = WikiprepESAdb.getInstance().getConnection()
 				.prepareStatement(getLoadAllQuery());
-		int c = 0;
+		ResultSet rs = null;
 		try {
 	        pstmtLoadAll.execute();
-	        ResultSet rs = pstmtLoadAll.getResultSet();
+	        rs = pstmtLoadAll.getResultSet();
 	        while(rs.next()) {
 	        	K k = getKeyFromRs(rs);
 	        	V v = getValueFromRs(rs, cache.get(k));
 	        	addToCache(k, v);
-		        c ++;
-		        if (c % 10000 == 0) {
-		        	System.out.println("loaded: " + c + " rows");
-		        }
 	        }
+	        rs.close();
+	        pstmtLoadAll.close();
 		}catch(SQLException e) {
+	        rs.close();
+	        pstmtLoadAll.close();
 			throw new RuntimeException(e);
 		}
+		
 	}
 	
 	private void setAllLoadedMode() {
