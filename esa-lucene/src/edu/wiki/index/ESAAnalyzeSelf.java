@@ -14,6 +14,7 @@ import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESAMultiResolutionSearcher;
 import edu.wiki.util.WikiprepESAdb;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
+import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
 
 /**
@@ -23,7 +24,7 @@ import edu.wiki.util.db.TermQueryOptimizer;
  */
 public class ESAAnalyzeSelf {
 	static int MAX_TERMS_PER_VECTOR = 1000;
-	static int BATCH_SIZE = 10000;
+	static int BATCH_SIZE = 1000;
 	static String strArticleQuery = "SELECT old_id, old_text FROM text LIMIT ?,?";
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
 	  
@@ -37,29 +38,26 @@ public class ESAAnalyzeSelf {
 				"vector MEDIUMBLOB " +
 				") DEFAULT CHARSET=binary");
 		
-		System.out.println("count article texts...");
-		Statement stmtLimit = WikiprepESAdb.getInstance().getConnection().createStatement();
-		ResultSet res = stmtLimit.executeQuery("SELECT count(old_id) FROM text");
-		res.next();
-		int countArticles = res.getInt(1);
-		
 		ESAMultiResolutionSearcher searcher = new ESAMultiResolutionSearcher();
 		System.out.println("in-memory cache tables...");
 		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
 		TermQueryOptimizer.getInstance().loadAll();
+		IdfQueryOptimizer.getInstance().loadAll();
 
 		System.out.println("start working...");
 		PreparedStatement pstmt = WikiprepESAdb.getInstance().getConnection().prepareStatement(strArticleQuery);
 		PreparedStatement pstmtWrite = WikiprepESAdb.getInstance().getConnection().prepareStatement(strVectorInsert);
 
+		int last_c = -1;
 		int c = 0;
-		while (c < countArticles) {
+		while (c != last_c) {
 			pstmt.setInt(1, c);
 			pstmt.setInt(2, BATCH_SIZE);
 			pstmt.execute();
 			ResultSet rs = pstmt.getResultSet();
+			last_c = c;
 			while(rs.next()) {
-				int conceptId = rs.getInt(1);
+					int conceptId = rs.getInt(1);
 				String articleText = new String(rs.getBytes(2), "UTF-8");
 				IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(articleText, 1000, true);
 
@@ -91,5 +89,15 @@ public class ESAAnalyzeSelf {
 				}
 			}
 		}
+		
+		System.out.println("Adding primary key to table");
+		stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
+		stmt.execute("ALTER TABLE concept_esa_vctors " +
+				"CHANGE COLUMN id id INT(10) NOT NULL," +
+				"ADD PRIMARY KEY (id)");
+		stmt.close();
+		WikiprepESAdb.getInstance().getConnection().commit();
+		WikiprepESAdb.getInstance().getConnection().close();
+		
 	}
 }

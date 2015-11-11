@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +25,7 @@ import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.TermVectorIterator;
 import edu.wiki.util.WikiprepESAConfiguration;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
+import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
 
@@ -269,6 +271,23 @@ public class ESASearcher {
 		cvNormal.add(cvLink);
 		
 		return cvNormal;
+	}
+	
+	public IConceptVector getConceptESAVector(int conceptId) throws IOException {
+		Map<Integer,byte[]> map = ConceptESAVectorQueryOptimizer.getInstance()
+				.doQuery(new HashSet<Integer>(Arrays.asList(conceptId)));
+
+		if (map.isEmpty()) {
+			return null;
+		}
+
+		TermVectorIterator tvi = new TermVectorIterator(map.get(conceptId));
+		IConceptVector result = new TroveConceptVector(tvi.getVectorLen());
+		while(tvi.next()) {
+			result.set(tvi.getConceptId(), 
+					tvi.getConceptScore());
+		}
+		return result;
 	}
 	
 	/**

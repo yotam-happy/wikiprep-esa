@@ -40,4 +40,8 @@ public class TermVectorIterator {
     public float getConceptScore() {
     	return currConceptScore;
     }
+    
+    public int getVectorLen() {
+    	return vectorLen;
+    }
 }
