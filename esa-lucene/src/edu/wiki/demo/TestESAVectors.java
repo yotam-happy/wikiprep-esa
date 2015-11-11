@@ -14,70 +14,24 @@ import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESASearcher;
 import edu.wiki.util.WikiprepESAdb;
 
-public class TestESAVectors {
+public class TestESAVectors extends AbstractTestClass{
 	
-	static Connection connection;
-	static Statement stmtQuery;
-	
-	static String strTitles = "SELECT id,title FROM article WHERE id IN ";
-	
-	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
-		connection = WikiprepESAdb.getInstance().getConnection();
-		stmtQuery = connection.createStatement();
-		stmtQuery.setFetchSize(100);
-
-  }
-
-	/**
-	 * @param args
-	 * @throws IOException 
-	 * @throws SQLException 
-	 * @throws ClassNotFoundException 
-	 */
 	public static void main(String[] args) throws ClassNotFoundException, SQLException, IOException {
-		ESASearcher searcher = new ESASearcher();
-		initDB();
-		
-		BufferedReader in = new BufferedReader(new InputStreamReader(System.in,"UTF-8"));
-		String text = in.readLine();
-		
-		IConceptVector cvBase = searcher.getConceptVector(text);
-		IConceptVector cv = searcher.getNormalVector(cvBase,10);
-		
-		if(cv == null){
-			System.exit(1);
-		}
-		
-		IConceptIterator it = cv.orderedIterator();
-		
-		HashMap<Integer, Double> vals = new HashMap<Integer, Double>(10);
-		HashMap<Integer, String> titles = new HashMap<Integer, String>(10);
-		
-		String inPart = "(";
-		
-		int count = 0;
-		while(it.next() && count < 10){
-			inPart += it.getId() + ",";
-			vals.put(it.getId(),it.getValue());
-			count++;
-		}
-		
-		inPart = inPart.substring(0,inPart.length()-1) + ")";
-				
-		ResultSet r = stmtQuery.executeQuery(strTitles + inPart);
-		while(r.next()){
-			titles.put(r.getInt(1), new String(r.getBytes(2),"UTF-8")); 
-		}
-		
-		count = 0;
-		it.reset();
-		while(it.next() && count < 10){
-			int id = it.getId();
-			System.out.println(id + "\t\t" + titles.get(id) + "\t\t" + vals.get(id));
-			count++;
-		}
-		
-
+		TestCombinedESAVectors test = new TestCombinedESAVectors();
+		test.doMain(args);
 	}
 
+	@Override
+	public IConceptVector getVector() {
+		try {
+			ESASearcher searcher = new ESASearcher();
+			BufferedReader in = new BufferedReader(new InputStreamReader(System.in,"UTF-8"));
+			String text = "artificial intelligence";//in.readLine();
+			
+			IConceptVector cvBase = searcher.getConceptVector(text);
+			return searcher.getNormalVector(cvBase, MAX_CONCEPTS);
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}	
 }
