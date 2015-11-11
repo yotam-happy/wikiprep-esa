@@ -83,10 +83,13 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		// for keys that are found in cache, get the value
 		// for the others, keep for query
 		for (K key : keys) {
-			if (maxCacheEntries != 0 && cache.containsKey(key)) {
+			if (getNoCacheMode() && cache.containsKey(key)) {
 				cache_hits += 1;
 				result.put(key, cache.get(key));
 			} else {
+				if (getAllLoadedMode()) {
+					break;
+				}
 				toQuery.add(key);
 				cache_misses += 1;
 			}
@@ -130,8 +133,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	}
 	
 	private void evacuateFromCache() {
-		// cache is disabled
-		if (maxCacheEntries == 0) {
+		if (getAllLoadedMode() || getNoCacheMode()) {
 			return;
 		}
 		// If cache is full then remove one element.
@@ -151,7 +153,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		}
 	}
 	private void addToCache(K k, V v) {
-		if (maxCacheEntries == 0) {
+		if (getNoCacheMode()) {
 			return;
 		}
 		evacuateFromCache();
@@ -170,11 +172,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	
 	public void setMaxCachEntries(int maxCacheEntries) {
 		this.maxCacheEntries = maxCacheEntries;
-		if (maxCacheEntries == 0) {
-			cache.clear();
-		} else {
-			evacuateFromCache();
-		}
+		evacuateFromCache();
 	}
 	
 	private static String expandQuery(String q, int k) {
@@ -199,7 +197,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		if (getLoadAllQuery() == null) {
 			return;
 		}
-		setMaxCachEntries(Integer.MAX_VALUE);
+		setAllLoadedMode();
 		cache.clear();
 		PreparedStatement pstmtLoadAll = WikiprepESAdb.getInstance().getConnection()
 				.prepareStatement(getLoadAllQuery());
@@ -219,5 +217,15 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		}catch(SQLException e) {
 			throw new RuntimeException(e);
 		}
+	}
+	
+	private void setAllLoadedMode() {
+		maxCacheEntries = -1;
+	}
+	private boolean getAllLoadedMode() {
+		return maxCacheEntries == -1;
+	}
+	private boolean getNoCacheMode() {
+		return maxCacheEntries == 0;
 	}
 }
