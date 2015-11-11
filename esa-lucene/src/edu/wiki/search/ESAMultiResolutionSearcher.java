@@ -2,10 +2,7 @@ package edu.wiki.search;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.lucene.analysis.CustomTokenizer;
@@ -14,6 +11,8 @@ import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.concept.TroveConceptVector;
+import gnu.trove.TIntDoubleHashMap;
+import gnu.trove.TIntDoubleIterator;
 
 /**
  * Builds an ESA vector for a document based on multi resolution contexts 
@@ -31,10 +30,10 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		// Compute by contexts: document resolution, 50 word resolution and 10 word resolution
 		Set<String> contexts = new HashSet<String>();
 		contexts.add(doc);
-		contexts.addAll(getWindowOfWordsContexts(doc, 50));
-		contexts.addAll(getWindowOfWordsContexts(doc, 10));
+		contexts.addAll(getWindowOfWordsContexts(doc, 100));
+		contexts.addAll(getWindowOfWordsContexts(doc, 15));
 		
-		Map<Integer,Double> result = new HashMap<Integer, Double>();
+		TIntDoubleHashMap result = new TIntDoubleHashMap();
 
 		// Get k best describing concepts from each context
 		for (String context : contexts) {
@@ -42,8 +41,11 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 			if (v == null || v.count() == 0) {
 				continue;
 			}
+			
+			
 			IConceptIterator iter = v.orderedIterator();
 			int k = 5;
+			
 			while (iter.next() && k > 0) {
 				int conceptId = iter.getId();
 				double conceptScore = iter.getValue();
@@ -57,8 +59,10 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		
 		// build final vector
 		IConceptVector vec = new TroveConceptVector(result.size());
-		for (Entry<Integer,Double> e : result.entrySet()) {
-			vec.add(e.getKey(), e.getValue());
+		TIntDoubleIterator iter = result.iterator();
+		while(iter.hasNext()) {
+			iter.advance();
+			vec.set(iter.key(), iter.value());
 		}
 		vec = getNormalVector(vec, conceptsLimit);
 		return vec;

@@ -5,12 +5,8 @@ import java.io.StringReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.lucene.analysis.TokenStream;
@@ -22,12 +18,19 @@ import edu.wiki.api.concept.scorer.CosineScorer;
 import edu.wiki.concept.ConceptVectorSimilarity;
 import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
+import edu.wiki.util.HeapSort;
 import edu.wiki.util.TermVectorIterator;
 import edu.wiki.util.WikiprepESAConfiguration;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
+import gnu.trove.THashMap;
+import gnu.trove.THashSet;
+import gnu.trove.TIntDoubleHashMap;
+import gnu.trove.TIntDoubleIterator;
+import gnu.trove.TObjectDoubleHashMap;
+import gnu.trove.TObjectIntHashMap;
 
 /**
  * Performs search on the index located in database.
@@ -37,8 +40,8 @@ import edu.wiki.util.db.TermQueryOptimizer;
 public class ESASearcher {
 	WikipediaAnalyzer analyzer;
 	
-	HashMap<String, Integer> freqMap = new HashMap<String, Integer>(30);
-	HashMap<String, Double> tfidfMap = new HashMap<String, Double>(30);
+	TObjectIntHashMap<String> freqMap = new TObjectIntHashMap<String>();
+	TObjectDoubleHashMap<String> tfidfMap = new TObjectDoubleHashMap<String>();
 	
 	ArrayList<String> termList = new ArrayList<String>(30);
 	
@@ -71,23 +74,16 @@ public class ESASearcher {
 	public IConceptVector getConceptVector(String query) throws IOException{
 		String strTerm;
 		int numTerms = 0;
-		int doc;
-		double score;
 		int vint;
 		double vdouble;
 		double tf;
 		double vsum;
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
-
         this.clean();
-
         ts.reset();
-        
         while (ts.incrementToken()) { 
-        	
             TermAttribute t = ts.getAttribute(TermAttribute.class);
             strTerm = t.term();
-            
             // records term counts for TF
             if(freqMap.containsKey(strTerm)){
             	vint = freqMap.get(strTerm);
@@ -96,11 +92,8 @@ public class ESASearcher {
             else {
             	freqMap.put(strTerm, 1);
             }
-            
             termList.add(strTerm);
-	            
             numTerms++;	
-
         }
                 
         ts.end();
@@ -130,36 +123,42 @@ public class ESASearcher {
         	tfidfMap.put(tk, vdouble / vsum);
         }
        
-        Map<Integer, Double> result = new HashMap<Integer, Double>();  
+        TIntDoubleHashMap result = new TIntDoubleHashMap();  
 
-        score = 0;
-        Map<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
+        THashMap<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
         		.doQuery(new HashSet<String>(termList));
 
-        for (Entry<String, byte[]> entry : termVectors.entrySet()) { 
-        	TermVectorIterator iter = new TermVectorIterator(entry.getValue());
-        	while (iter.next()) {
-				doc = iter.getConceptId();
-				score = iter.getConceptScore() * tfidfMap.get(entry.getKey());
-				Double curr = result.get(doc);
-				if (curr != null) {
-					score += curr;
+        termVectors.forEach((k,v) -> {
+        	try {
+            	TermVectorIterator iter = new TermVectorIterator(v);
+				while (iter.next()) {
+					int doc = iter.getConceptId();
+					double score = iter.getConceptScore() * tfidfMap.get(k);
+					Double curr = result.get(doc);
+					if (curr != null) {
+						score += curr;
+					}
+					if (score != 0) {
+						result.put(doc, score);
+					}
 				}
-				result.put(doc, score);
-        	}
-    	}
+			} catch (Exception e) {
+				throw new RuntimeException(e);
+			}
+        });
         
         // no result
-        if(score == 0){
+        if(result.size() == 0){
         	return null;
         }
 
         
         IConceptVector newCv = new TroveConceptVector(result.size());
-		for( Entry<Integer, Double> e : result.entrySet()) {
-			newCv.set( e.getKey(), e.getValue() / numTerms );
-		}
-		
+        TIntDoubleIterator iter = result.iterator();
+        while(iter.hasNext()) {
+        	iter.advance();
+			newCv.set( iter.key(), iter.value() / numTerms );
+        }
 		return newCv;
 	}
 	
@@ -184,6 +183,10 @@ public class ESASearcher {
 		if(cv == null)
 			return null;
 		
+		if (cv.count() <= LIMIT) {
+			return cv;
+		}
+		
 		it = cv.orderedIterator();
 		
 		int count = 0;
@@ -202,12 +205,14 @@ public class ESASearcher {
 		return getLinkVector(cv, LINK_ALPHA, limit);
 	}
 	
+	Set<Integer> ids = new THashSet<Integer>();
+	TIntDoubleHashMap bonus = new TIntDoubleHashMap();
 	public IConceptVector getLinkVector(IConceptVector cv, double ALPHA, int LIMIT) {
 		if(cv == null)
 			return null;
 
-		IConceptIterator it = cv.orderedIterator();
-		Set<Integer> ids = new HashSet<Integer>();
+		IConceptIterator it = cv.iterator();
+		ids.clear();
 		while(it.next()){
 			ids.add(it.getId());
 		}
@@ -215,9 +220,9 @@ public class ESASearcher {
 		Map<Integer, byte[]> concept2nd = Concept2ndOrderQueryOptimizer.getInstance()
 				.doQuery(ids);
 		
-		Map<Integer, Double> bonus = new HashMap<Integer, Double>();
+		bonus.clear();
 		
-		it = cv.orderedIterator();
+		it = cv.iterator();
 		while(it.next()){
 			int conceptId = it.getId();
 			double conceptScore = it.getValue();
@@ -229,7 +234,7 @@ public class ESASearcher {
 				while(tvi.next()) {
 					int targetId = tvi.getConceptId();
 					bonus.put(targetId, 
-							tvi.getConceptScore() * conceptScore + (bonus.get(targetId) == null ? 0.0 : bonus.get(targetId)));
+							tvi.getConceptScore() * conceptScore + (!bonus.containsKey(targetId) ? 0.0 : bonus.get(targetId)));
 				}
 			} catch(IOException e) {
 				throw new RuntimeException(e);
@@ -237,12 +242,18 @@ public class ESASearcher {
 		}
 
 		IConceptVector linkVector = new TroveConceptVector(bonus.size());
-		List<Entry<Integer,Double>> sortedEntries = new ArrayList<Entry<Integer,Double>>(bonus.entrySet());
-		Collections.sort(sortedEntries, (v1, v2) -> - Double.compare(v1.getValue(), v2.getValue()));
+		int[] index = bonus.keys();
+		double[] values = bonus.getValues();
+		
+		// We want the best LIMIT concepts.
+		// only if there are more then LIMIT concepts, use HeapSort to find the best ones
+		if (LIMIT < index.length) {
+			HeapSort.heapSort( values, index );
+		}
 		
 		int c = 0;
-		for(Entry<Integer, Double> e : sortedEntries){
-			linkVector.set(e.getKey(), e.getValue() * ALPHA);
+		for(int i = index.length - 1; i >= 0; i--){
+			linkVector.set(index[i], values[i] * ALPHA);
 			c++;
 			if(c >= LIMIT){
 				break;

@@ -8,7 +8,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -78,14 +77,17 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 */
 	protected abstract String getLoadAllQuery();
 	
-	public Map<K,V> doQuery(Set<K> keys) {
-		final List<K> toQuery = new ArrayList<K>();
-		final Map<K,V> result = new HashMap<K,V>();
+	final List<K> toQuery = new ArrayList<K>();
+	final Map<K,V> res = new THashMap<K,V>();
+	
+	public THashMap<K,V> doQuery(Set<K> keys) {
+		toQuery.clear();
+		final THashMap<K,V> result = new THashMap<K,V>();
 		
 		// for keys that are found in cache, get the value
 		// for the others, keep for query
 		for (K key : keys) {
-			if (getNoCacheMode() && cache.containsKey(key)) {
+			if ((!getNoCacheMode()) && cache.containsKey(key)) {
 				cache_hits += 1;
 				result.put(key, cache.get(key));
 			} else {
@@ -119,7 +121,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	
 	private Map<K,V> executePstmt() {
 		try {
-	        Map<K,V> res = new HashMap<K,V>();
+			res.clear();
 			pstmt.execute();
 	        ResultSet rs = pstmt.getResultSet();
 	        while(rs.next()) {
