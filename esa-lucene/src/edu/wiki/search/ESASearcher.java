@@ -20,7 +20,6 @@ import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.HeapSort;
 import edu.wiki.util.TermVectorIterator;
-import edu.wiki.util.WikiprepESAConfiguration;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
@@ -40,6 +39,7 @@ import gnu.trove.TObjectIntHashMap;
 public class ESASearcher {
 	WikipediaAnalyzer analyzer;
 	
+	int numTerms = 0;
 	TObjectIntHashMap<String> freqMap = new TObjectIntHashMap<String>();
 	TObjectDoubleHashMap<String> tfidfMap = new TObjectDoubleHashMap<String>();
 	
@@ -72,12 +72,9 @@ public class ESASearcher {
 	 * @throws SQLException
 	 */
 	public IConceptVector getConceptVector(String query) throws IOException{
-		String strTerm;
-		int numTerms = 0;
+		numTerms = 0;
 		int vint;
-		double vdouble;
-		double tf;
-		double vsum;
+		String strTerm;
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
         this.clean();
         ts.reset();
@@ -98,6 +95,13 @@ public class ESASearcher {
                 
         ts.end();
         ts.close();
+        
+        return getConceptVectorInternal();
+	}
+	private IConceptVector getConceptVectorInternal() throws IOException{
+		double vdouble;
+		double tf;
+		double vsum;
                 
         if(numTerms == 0){
         	return null;
@@ -131,15 +135,12 @@ public class ESASearcher {
         termVectors.forEach((k,v) -> {
         	try {
             	TermVectorIterator iter = new TermVectorIterator(v);
+            	double termTfidf = tfidfMap.get(k);
 				while (iter.next()) {
 					int doc = iter.getConceptId();
-					double score = iter.getConceptScore() * tfidfMap.get(k);
-					Double curr = result.get(doc);
-					if (curr != null) {
-						score += curr;
-					}
+					double score = iter.getConceptScore() * termTfidf + result.get(doc);
 					if (score != 0) {
-						result.put(doc, score);
+						result.put(iter.getConceptId(), score);
 					}
 				}
 			} catch (Exception e) {
@@ -162,13 +163,13 @@ public class ESASearcher {
 		return newCv;
 	}
 	
-	public IConceptVector getNormalVector(String query) throws IOException {
+	public IConceptVector getNormalVector(String query, int maxVectorLen) throws IOException {
 		IConceptVector cvBase = getConceptVector(query);
 		
 		if(cvBase == null){
 			return null;
 		}
-		return getNormalVector(cvBase, WikiprepESAConfiguration.getInstance().getIntProperty(WikiprepESAConfiguration.NORMALIZED_VECTOR_SIZE_LIMIT));
+		return getNormalVector(cvBase, maxVectorLen);
 	}
 	
 	/**
@@ -234,7 +235,7 @@ public class ESASearcher {
 				while(tvi.next()) {
 					int targetId = tvi.getConceptId();
 					bonus.put(targetId, 
-							tvi.getConceptScore() * conceptScore + (!bonus.containsKey(targetId) ? 0.0 : bonus.get(targetId)));
+							tvi.getConceptScore() * conceptScore + bonus.get(targetId));
 				}
 			} catch(IOException e) {
 				throw new RuntimeException(e);
@@ -269,15 +270,15 @@ public class ESASearcher {
 	 * @param secondOrderLimit	When doing 2nd order vector, max number of top
 	 * 							bonus scoring elements to update
 	 */
-	public IConceptVector getCombinedVector(String query) throws IOException {
+	public IConceptVector getCombinedVector(String query, int maxVectorLen) throws IOException {
 		IConceptVector cvBase = getConceptVector(query);
 		IConceptVector cvNormal, cvLink;
 		
 		if(cvBase == null){
 			return null;
 		}
-		cvNormal = getNormalVector(cvBase, WikiprepESAConfiguration.getInstance().getIntProperty(WikiprepESAConfiguration.NORMALIZED_VECTOR_SIZE_LIMIT));
-		cvLink = getLinkVector(cvNormal,WikiprepESAConfiguration.getInstance().getIntProperty(WikiprepESAConfiguration.SECOND_ORDER_BONUS_VECTOR_LIMIT));
+		cvNormal = getNormalVector(cvBase, maxVectorLen);
+		cvLink = getLinkVector(cvNormal,maxVectorLen);
 		
 		cvNormal.add(cvLink);
 		

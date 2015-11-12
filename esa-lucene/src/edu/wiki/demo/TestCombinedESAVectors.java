@@ -22,7 +22,7 @@ public class TestCombinedESAVectors extends AbstractTestClass {
 			BufferedReader in = new BufferedReader(new InputStreamReader(System.in,"UTF-8"));
 			String text = "artificial intelligence"; //in.readLine();
 			
-			return searcher.getCombinedVector(text);
+			return searcher.getCombinedVector(text, MAX_CONCEPTS);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

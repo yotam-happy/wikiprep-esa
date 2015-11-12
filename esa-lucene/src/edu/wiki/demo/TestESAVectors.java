@@ -3,16 +3,10 @@ package edu.wiki.demo;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.HashMap;
 
-import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESASearcher;
-import edu.wiki.util.WikiprepESAdb;
 
 public class TestESAVectors extends AbstractTestClass{
 	

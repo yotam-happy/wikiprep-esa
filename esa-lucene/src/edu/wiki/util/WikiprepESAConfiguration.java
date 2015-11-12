@@ -16,8 +16,6 @@ public class WikiprepESAConfiguration {
 	public final static String SCHEMA_NAME = "schema_name";
 	public final static String USERNAME = "username";
 	public final static String PASSWORD = "password";
-	public final static String NORMALIZED_VECTOR_SIZE_LIMIT = "normalized_vector_size_limit";
-	public final static String SECOND_ORDER_BONUS_VECTOR_LIMIT = "second_order_bonus_vector_limit";
 	
 	static WikiprepESAConfiguration wikiprepESAConfiguration; 
 	Properties configuration;
