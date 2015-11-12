@@ -18,7 +18,7 @@ import edu.wiki.api.concept.scorer.CosineScorer;
 import edu.wiki.concept.ConceptVectorSimilarity;
 import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
-import edu.wiki.util.HeapSort;
+import edu.wiki.util.InplaceSorts;
 import edu.wiki.util.TermVectorIterator;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
@@ -72,8 +72,11 @@ public class ESASearcher {
 	 * @throws SQLException
 	 */
 	public IConceptVector getConceptVector(String query) throws IOException{
-		numTerms = 0;
+		double vdouble;
+		double tf;
+		double vsum;
 		int vint;
+		numTerms = 0;
 		String strTerm;
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
         this.clean();
@@ -96,13 +99,6 @@ public class ESASearcher {
         ts.end();
         ts.close();
         
-        return getConceptVectorInternal();
-	}
-	private IConceptVector getConceptVectorInternal() throws IOException{
-		double vdouble;
-		double tf;
-		double vsum;
-                
         if(numTerms == 0){
         	return null;
         }
@@ -249,7 +245,7 @@ public class ESASearcher {
 		// We want the best LIMIT concepts.
 		// only if there are more then LIMIT concepts, use HeapSort to find the best ones
 		if (LIMIT < index.length) {
-			HeapSort.heapSort( values, index );
+			InplaceSorts.quicksort(values, index);
 		}
 		
 		int c = 0;

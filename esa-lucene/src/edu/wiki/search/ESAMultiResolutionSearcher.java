@@ -26,12 +26,14 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		super();
 	}
 
-	public IConceptVector getConceptVectorUsingMultiResolution(String doc, int conceptsLimit, boolean use2ndOrder) throws IOException {
+	public IConceptVector getConceptVectorUsingMultiResolution(String doc, int conceptsLimit, boolean use2ndOrder, boolean useShortContexts) throws IOException {
 		// Compute by contexts: document resolution, 50 word resolution and 10 word resolution
 		Set<String> contexts = new HashSet<String>();
 		contexts.add(doc);
 		contexts.addAll(getWindowOfWordsContexts(doc, 100));
-		contexts.addAll(getWindowOfWordsContexts(doc, 15));
+		if(useShortContexts) {
+			contexts.addAll(getWindowOfWordsContexts(doc, 15));
+		}
 		
 		TIntDoubleHashMap result = new TIntDoubleHashMap();
 

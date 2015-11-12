@@ -34,8 +34,8 @@ public class ESAAnalyzeSelf {
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
 	  
+	
 	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
-//		File f = File.createTempFile("wiki", "wiki");
 		File f = new File(args[0]);
 		FileOutputStream fos = new FileOutputStream(f);
 		DataOutputStream dos = new DataOutputStream(fos);
@@ -69,7 +69,10 @@ public class ESAAnalyzeSelf {
 		while(rs.next()) {
 			int conceptId = rs.getInt(1);
 			String articleText = new String(rs.getBytes(2), "UTF-8");
-			IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(articleText, 1000, false);
+
+			// Dont use short contexts because my computer is too slow....
+			IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(articleText, 1000, false, false);
+			
 			// write concept id
 			dos.writeInt(conceptId);
 			byteswritten += 4;

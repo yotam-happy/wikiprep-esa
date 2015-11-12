@@ -1,6 +1,6 @@
 package edu.wiki.modify;
 
-import edu.wiki.util.HeapSort;
+import edu.wiki.util.InplaceSorts;
 import edu.wiki.util.WikiprepESAdb;
 import gnu.trove.TIntDoubleHashMap;
 import gnu.trove.TIntFloatHashMap;
@@ -300,7 +300,7 @@ public class IndexModifier {
 				int [] arrDocs = hmap.keys();
 		    	float [] arrScores = hmap.getValues();
 		    	
-		    	HeapSort.heapSort(arrScores, arrDocs);
+		    	InplaceSorts.quicksort(arrScores, arrDocs);
 		    	
 		    	// prune the vector
 		    	
