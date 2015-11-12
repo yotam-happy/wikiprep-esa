@@ -45,7 +45,7 @@ public class ESASearcher {
 	
 	ArrayList<String> termList = new ArrayList<String>(30);
 	
-	static float LINK_ALPHA = 0.5f;
+	static final float LINK_ALPHA = 0.5f;
 	
 	ConceptVectorSimilarity sim = new ConceptVectorSimilarity(new CosineScorer());
 		

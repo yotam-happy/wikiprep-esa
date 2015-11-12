@@ -16,10 +16,13 @@ import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESAMultiResolutionSearcher;
+import edu.wiki.util.Tuple;
 import edu.wiki.util.WikiprepESAdb;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
@@ -31,30 +34,25 @@ import edu.wiki.util.db.TermQueryOptimizer;
  *
  */
 public class ESAAnalyzeSelf {
+
+	static class Task {
+		public final int taskId;
+		public final List<Tuple<Integer,String>> tuples;
+		public Task(int taskId, List<Tuple<Integer,String>> tuples) {
+			this.taskId = taskId;
+			this.tuples = tuples;
+		}
+	}
+	
+	static int THREADS = 4;
+	static int BATCH_SIZE = 10;
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
-	  
 	
 	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
-		File f = new File(args[0]);
-		FileOutputStream fos = new FileOutputStream(f);
-		DataOutputStream dos = new DataOutputStream(fos);
-		// Reset 2nd order vectors table
-		System.out.println("Preparing tables...");
+		String baseFileName = args[0];
 		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
-		stmt.execute("DROP TABLE IF EXISTS concept_esa_vectors");
-		stmt.execute("CREATE TABLE concept_esa_vectors (" +
-				"id INT(10)," +
-				"vector MEDIUMBLOB " +
-				") DEFAULT CHARSET=binary");
-		stmt.close();
-		
-		ESAMultiResolutionSearcher searcher = new ESAMultiResolutionSearcher();
-		System.out.println("in-memory cache tables...");
-		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
-		TermQueryOptimizer.getInstance().loadAll();
-		IdfQueryOptimizer.getInstance().loadAll();
-
+		Init(baseFileName);
 		System.out.println("start working, saving result to tmp file...");
 
 		stmt = WikiprepESAdb.getInstance().getConnection()
@@ -66,85 +64,152 @@ public class ESAAnalyzeSelf {
 		stmt.execute("SELECT old_id, old_text FROM text");
 		ResultSet rs = stmt.getResultSet();
 		Instant start = Instant.now();
-		while(rs.next()) {
-			int conceptId = rs.getInt(1);
-			String articleText = new String(rs.getBytes(2), "UTF-8");
+		boolean finished = false;
+		while(!finished) {
 
-			// Dont use short contexts because my computer is too slow....
-			IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(articleText, 1000, false, false);
+			// Collect batchs for each thread
+			List<Task> tasks = new ArrayList<Task>();
+			int k = 0;
+			while (k < THREADS && !finished) {
+				List<Tuple<Integer,String>> tuples = new ArrayList<Tuple<Integer,String>>();
+				tasks.add(new Task(k, tuples));
+				int i = 0;
+				while (i < BATCH_SIZE) {
+					if (!rs.next()) {
+						finished = true;
+						break;
+					}
+					i++;
+			    	c++;
+					Tuple<Integer, String> tuple = new Tuple<Integer, String>(rs.getInt(1), new String(rs.getBytes(2), "UTF-8"));
+					tuples.add(tuple);
+				}
+				k++;
+			}
 			
-			// write concept id
-			dos.writeInt(conceptId);
-			byteswritten += 4;
-			// prune this vector at 1000
-	    	int max = vector.size() < MAX_TERMS_PER_VECTOR ? vector.size() : MAX_TERMS_PER_VECTOR; 
-	    	// write vector
-	    	dos.writeInt(max);
-	    	byteswritten += 4;
-	    	int count = 0;
-	    	// Use orderedIterator sparingly... Only if necessary 
-	    	IConceptIterator iter = vector.count() > MAX_TERMS_PER_VECTOR ? vector.orderedIterator() :
-	    		vector.iterator();
-	    	while(iter.next() && count < MAX_TERMS_PER_VECTOR) {
-	    		dos.writeInt(iter.getId());
-	    		byteswritten += 4;
-	    		dos.writeFloat((float)iter.getValue());
-	    		byteswritten += 8;
-	    		count++;
-	    	}
+			// run k threads
+			tasks.parallelStream().forEach((task) -> {
+				final FileOutputStream fos;
+				try {
+					ESAMultiResolutionSearcher searcher = new ESAMultiResolutionSearcher();
+					fos = new FileOutputStream(baseFileName + task.taskId, true);
+					final DataOutputStream dos = new DataOutputStream(fos);
+
+					task.tuples.stream().forEach((tuple) -> {
+						try {
+							// Dont use short contexts because my computer is too slow....
+							IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(tuple.y, 1000, false, false);
+							
+							// write concept id
+							dos.writeInt(tuple.x);
+							// prune this vector at 1000
+					    	int max = vector.size() < MAX_TERMS_PER_VECTOR ? vector.size() : MAX_TERMS_PER_VECTOR; 
+					    	// write vector
+					    	dos.writeInt(max);
+					    	int count = 0;
+					    	// Use orderedIterator sparingly... Only if necessary 
+					    	IConceptIterator iter = vector.count() > MAX_TERMS_PER_VECTOR ? vector.orderedIterator() :
+					    		vector.iterator();
+					    	while(iter.next() && count < MAX_TERMS_PER_VECTOR) {
+					    		dos.writeInt(iter.getId());
+					    		dos.writeFloat((float)iter.getValue());
+					    		count++;
+					    	}
+						} catch(Exception e) {
+							throw new RuntimeException(e);
+						}
+					});
+					dos.close();
+					fos.close();
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			});
+			
 			
 	    	Duration dur = Duration.between(start, Instant.now());
 	    	double rate = (double)c / ((double)dur.get(ChronoUnit.SECONDS) / 60.0);
-	    	c++;
 			System.out.println("articles transformed: " + c + ", avg: " + rate + " articles per minute (" 
 					+ byteswritten + " bytes written)");
 		}
-		dos.close();
-		fos.close();
 		
+		System.out.println("total articles transformed: " + c); 
+
+		Finish(baseFileName);
+		
+	}
+	
+	private static void Init(String baseFilename) throws SQLException, ClassNotFoundException, IOException {
+		// Reset 2nd order vectors table
+		System.out.println("Preparing tables...");
+		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
+		stmt.execute("DROP TABLE IF EXISTS concept_esa_vectors");
+		stmt.execute("CREATE TABLE concept_esa_vectors (" +
+				"id INT(10)," +
+				"vector MEDIUMBLOB " +
+				") DEFAULT CHARSET=binary");
+		stmt.close();
+		
+		System.out.println("in-memory cache tables...");
+		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
+		TermQueryOptimizer.getInstance().loadAll();
+		IdfQueryOptimizer.getInstance().loadAll();
+		
+		for (int i = 0; i < THREADS; i++) {
+			File f = new File(baseFilename + i);
+			if (f.exists()) {
+				f.delete();
+			}
+		}
+	}
+	
+	private static void Finish(String baseFilename) throws IOException, SQLException {
 		System.out.println("move data from tmp file to db...");
 		PreparedStatement pstmtWrite = WikiprepESAdb.getInstance().getConnection().prepareStatement(strVectorInsert);
 		// Read data from file to DB (note this cannot be done using LOAD DATA IN FILE
 		// which is preferable in general but here varbinary fields can't be loaded that way) 
-		FileInputStream fis = new FileInputStream(f);
-		DataInputStream dis = new DataInputStream(fis);
-		int c2 = 0;
-		try {
-			while (true) { // loop ends when EOF
-				int conceptId = dis.readInt();
-				
-		    	ByteArrayOutputStream baos = new ByteArrayOutputStream(100000);
-		    	DataOutputStream tmpdos = new DataOutputStream(baos);
-
-		    	// Read len and write to stream
-		    	int len = dis.readInt();
-		    	if (len > MAX_TERMS_PER_VECTOR) {
-		    		System.out.println("Something is wrong, got impossible vector len " + len);
-		    	}
-		    	tmpdos.writeInt(len);
-		    	for(int i = 0; i < len; i++) {
-		    		tmpdos.writeInt(dis.readInt());
-		    		tmpdos.writeFloat(dis.readFloat());
-		    	}
-		    	tmpdos.flush();
-
-		    	pstmtWrite.setInt(1, conceptId);
-		    	pstmtWrite.setBlob(2, new ByteArrayInputStream(baos.toByteArray()));
-		    	pstmtWrite.execute();
-				
-				c2++;
-				System.out.println("articles loaded to DB: " + c2);
+		int c = 0;
+		for (int i = 0; i < THREADS; i++) {
+			FileInputStream fis = new FileInputStream(baseFilename + i);
+			DataInputStream dis = new DataInputStream(fis);
+			try {
+				while (true) { // loop ends when EOF
+					int conceptId = dis.readInt();
+					
+			    	ByteArrayOutputStream baos = new ByteArrayOutputStream(100000);
+			    	DataOutputStream tmpdos = new DataOutputStream(baos);
+	
+			    	// Read len and write to stream
+			    	int len = dis.readInt();
+			    	if (len > MAX_TERMS_PER_VECTOR) {
+			    		System.out.println("Something is wrong, got impossible vector len " + len);
+			    	}
+			    	tmpdos.writeInt(len);
+			    	for(int j = 0; j < len; j++) {
+			    		tmpdos.writeInt(dis.readInt());
+			    		tmpdos.writeFloat(dis.readFloat());
+			    	}
+			    	tmpdos.flush();
+	
+			    	pstmtWrite.setInt(1, conceptId);
+			    	pstmtWrite.setBlob(2, new ByteArrayInputStream(baos.toByteArray()));
+			    	pstmtWrite.execute();
+					
+					c++;
+					if (c % 10000 == 0) {
+						System.out.println("articles loaded to DB: " + c);
+					}
+				}
+			}catch (EOFException e) {
+				// Done!
 			}
-		}catch (EOFException e) {
-			// Done!
+			dis.close();
+			fis.close();
 		}
-		
-		if (c != c2) {
-			System.out.println("Strange thing happened, written to file less then read... (written " + c + " read " + c2 + ")");
-		}
+		System.out.println("total articles loaded to db: " + c); 
 		
 		System.out.println("Adding primary key to table");
-		stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
+		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
 		stmt.execute("ALTER TABLE concept_esa_vectors " +
 				"CHANGE COLUMN id id INT(10) NOT NULL," +
 				"ADD PRIMARY KEY (id)");
