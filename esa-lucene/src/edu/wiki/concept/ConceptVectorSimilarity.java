@@ -14,6 +14,13 @@ public class ConceptVectorSimilarity {
 	}
 	
 	public double calcSimilarity( IConceptVector v0, IConceptVector v1 ) {
+		// Some speed optimization, can speed things up by a lot! 
+		if (v0.count() > v1.count()) {
+			IConceptVector tmp = v0;
+			v0 = v1;
+			v1 = tmp;
+		}
+		
 		m_scorer.reset( v0.getData(), v1.getData(), 1 );
 		
 		IConceptIterator it0 = v0.iterator();
