@@ -38,7 +38,6 @@ public class ESAWikipediaIndexer {
 	  static String strArticleQuery = "SELECT a.id,a.title,t.old_text FROM article a, text t WHERE ? <= a.id AND a.id < ? AND a.id = t.old_id";
 	  
 	  static String strLimitQuery = "SELECT MAX(id) FROM article;";
-	  static String strPrQuery = "SELECT MAX(score) FROM pagerank;";
 	  
 	  static int limitID; 
 	  int addCount = 0;
