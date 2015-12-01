@@ -11,7 +11,7 @@ import edu.wiki.search.ESASearcher;
 public class TestESAVectors extends AbstractTestClass{
 	
 	public static void main(String[] args) throws ClassNotFoundException, SQLException, IOException {
-		TestCombinedESAVectors test = new TestCombinedESAVectors();
+		TestESAVectors test = new TestESAVectors();
 		test.doMain(args);
 	}
 
