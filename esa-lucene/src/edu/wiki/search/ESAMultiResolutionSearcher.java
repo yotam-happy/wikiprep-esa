@@ -11,6 +11,7 @@ import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.concept.TroveConceptVector;
+import edu.wiki.util.MinHeap;
 import gnu.trove.TIntDoubleHashMap;
 import gnu.trove.TIntDoubleIterator;
 
@@ -22,12 +23,13 @@ import gnu.trove.TIntDoubleIterator;
  */
 public class ESAMultiResolutionSearcher extends ESASearcher {
 
+	public static final int CONCEPTS_PER_CONTEXT = 5;
+	public MinHeap maxHeap = new MinHeap(CONCEPTS_PER_CONTEXT);
 	public ESAMultiResolutionSearcher() throws ClassNotFoundException, IOException {
 		super();
 	}
 
 	public IConceptVector getConceptVectorUsingMultiResolution(String doc, int conceptsLimit, boolean use2ndOrder, boolean useShortContexts) throws IOException {
-		// Compute by contexts: document resolution, 50 word resolution and 10 word resolution
 		Set<String> contexts = new HashSet<String>();
 		contexts.add(doc);
 		contexts.addAll(getWindowOfWordsContexts(doc, 100));
@@ -43,6 +45,8 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 			if (v == null || v.count() == 0) {
 				continue;
 			}
+
+			
 			IConceptIterator iter = v.orderedIterator();
 			int k = 5;
 			while (iter.next() && k > 0) {

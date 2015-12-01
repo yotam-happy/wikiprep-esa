@@ -298,6 +298,12 @@ public class ESASearcher {
 		return result;
 	}
 	
+	public double getRelatedness(IConceptVector v1, IConceptVector v2){
+		if(v1 == null || v2 == null){
+			return -1;
+		}
+		return sim.calcSimilarity(v1, v2);
+	}
 	/**
 	 * Calculate semantic relatedness between documents
 	 * @param doc1
@@ -306,31 +312,12 @@ public class ESASearcher {
 	 */
 	public double getRelatedness(String doc1, String doc2){
 		try {
-			// IConceptVector c1 = getCombinedVector(doc1);
-			// IConceptVector c2 = getCombinedVector(doc2);
-			// IConceptVector c1 = getNormalVector(getConceptVector(doc1),10);
-			// IConceptVector c2 = getNormalVector(getConceptVector(doc2),10);
-			
 			IConceptVector c1 = getConceptVector(doc1);
 			IConceptVector c2 = getConceptVector(doc2);
-			
-			if(c1 == null || c2 == null){
-				// return 0;
-				return -1;	// undefined
-			}
-			
-			final double rel = sim.calcSimilarity(c1, c2);
-			
-			// mark for dealloc
-			c1 = null;
-			c2 = null;
-			
-			return rel;
-
+			return getRelatedness(c1, c2);
 		}
 		catch(Exception e){
-			e.printStackTrace();
-			return 0;
+			throw new RuntimeException(e);
 		}
 
 	}

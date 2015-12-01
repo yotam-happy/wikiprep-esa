@@ -7,10 +7,10 @@ import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * This class is used to optimize simple "by id" queries against static
@@ -77,16 +77,32 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 */
 	protected abstract String getLoadAllQuery();
 	
-	final List<K> toQuery = new ArrayList<K>();
-	final Map<K,V> res = new THashMap<K,V>();
+	public Stream<Entry<K, V>> cacheStream() {
+		return cache.entrySet().stream();
+	}
+	
+	public V doQuery(K key) {
+		if ((!getNoCacheMode()) && cache.containsKey(key)) {
+			cache_hits += 1;
+			return cache.get(key);
+		} else {
+			if (getAllLoadedMode()) {
+				return null;
+			}
+			// if not in cache, and not allLoadedMode, do query
+			cache_misses += 1;
+			setKeyInPstmt(pstmt, 0, key);
+			return executePstmt().get(key);
+		}
+	}
 	
 	public THashMap<K,V> doQuery(Set<K> keys) {
-		toQuery.clear();
 		final THashMap<K,V> result = new THashMap<K,V>();
 		
-		// for keys that are found in cache, get the value
-		// for the others, keep for query
+		// Do the queries, up to maxSelectGrouping at a time
+		int count = 0;
 		for (K key : keys) {
+			// if in cache add directly to results
 			if ((!getNoCacheMode()) && cache.containsKey(key)) {
 				cache_hits += 1;
 				result.put(key, cache.get(key));
@@ -94,20 +110,16 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 				if (getAllLoadedMode()) {
 					break;
 				}
-				toQuery.add(key);
+				// if not in cache, and not allLoadedMode, do query
+				setKeyInPstmt(pstmt, count % maxSelectGrouping + 1, key);
+				count++;
+				if (count % maxSelectGrouping == 0) {
+					result.putAll(executePstmt());
+				}
 				cache_misses += 1;
 			}
 		}
 		
-		// Do the queries, up to maxSelectGrouping at a time
-		int count = 0;
-		for (K key : toQuery) {
-			setKeyInPstmt(pstmt, count % maxSelectGrouping + 1, key);
-			count++;
-			if (count % maxSelectGrouping == 0) {
-				result.putAll(executePstmt());
-			}
-		}
 		// if there are some elements left, do them
 		if (count % maxSelectGrouping != 0) {
 			// fill left overs with null
@@ -120,6 +132,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	}
 	
 	private Map<K,V> executePstmt() {
+		final Map<K,V> res = new THashMap<K,V>();
 		try {
 			res.clear();
 			pstmt.execute();
