@@ -184,13 +184,10 @@ public class ESASearcher {
 			return cv;
 		}
 		
-		it = cv.orderedIterator();
+		it = cv.bestKOrderedIterator(LIMIT);
 		
-		int count = 0;
 		while(it.next()){
-			if(count >= LIMIT) break;
 			cv_normal.set(it.getId(), it.getValue());
-			count++;
 		}
 		
 		return cv_normal;

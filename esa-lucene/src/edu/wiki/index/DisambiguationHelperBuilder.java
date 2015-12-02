@@ -11,14 +11,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
 import edu.wiki.search.DisambiguatingText2Features;
 import edu.wiki.util.Tuple;
+import edu.wiki.util.WikiprepESAUtils;
 import edu.wiki.util.WikiprepESAdb;
 import edu.wiki.util.db.ArticleQueryOptimizer;
-import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
@@ -34,8 +35,8 @@ public class DisambiguationHelperBuilder {
 		}
 	}
 	
-	static int THREADS = 4;
-	static int BATCH_SIZE = 1;
+	static int THREADS = 8;
+	static int BATCH_SIZE = 4;
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
 	
@@ -87,9 +88,12 @@ public class DisambiguationHelperBuilder {
 					task.tuples.stream().forEach((tuple) -> {
 						try {
 							DisambiguatingText2Features disambiguatingText2Features = new DisambiguatingText2Features();
-							// get disambiguation features
-							Map<Integer, Double > features = disambiguatingText2Features.getDisambiguatingFeatures(tuple.y);
+							// get disambiguation contexts
+							Collection<String> contexts = WikiprepESAUtils.getWikipediaDocumentParagraph(tuple.y);
+							Map<Integer, Double > features = 
+									disambiguatingText2Features.getDisambiguatingFeatures(contexts.stream());
 							if (features.isEmpty()) {
+								dos.close();
 								return;
 							}
 							
@@ -129,8 +133,8 @@ public class DisambiguationHelperBuilder {
 	}
 	
 	private static void Init(String baseFilename) throws SQLException, ClassNotFoundException, IOException {
-		System.out.println("loading Concept2ndOrderQueryOptimizer");
-		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
+//		System.out.println("loading Concept2ndOrderQueryOptimizer");
+//		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
 		System.out.println("loading TermQueryOptimizer");
 		TermQueryOptimizer.getInstance().loadAll();
 		System.out.println("loading IdfQueryOptimizer");

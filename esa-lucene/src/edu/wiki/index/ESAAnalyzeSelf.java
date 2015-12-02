@@ -98,7 +98,7 @@ public class ESAAnalyzeSelf {
 					task.tuples.stream().forEach((tuple) -> {
 						try {
 							// Dont use short contexts because my computer is too slow....
-							IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(tuple.y, 1000, false, false);
+							IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(tuple.y, 1000, false, true);
 							
 							// write concept id
 							dos.writeInt(tuple.x);
@@ -108,8 +108,8 @@ public class ESAAnalyzeSelf {
 					    	dos.writeInt(max);
 					    	int count = 0;
 					    	// Use orderedIterator sparingly... Only if necessary 
-					    	IConceptIterator iter = vector.count() > MAX_TERMS_PER_VECTOR ? vector.orderedIterator() :
-					    		vector.iterator();
+					    	IConceptIterator iter = vector.count() > MAX_TERMS_PER_VECTOR ? 
+					    			vector.bestKOrderedIterator(MAX_TERMS_PER_VECTOR) : vector.iterator();
 					    	while(iter.next() && count < MAX_TERMS_PER_VECTOR) {
 					    		dos.writeInt(iter.getId());
 					    		dos.writeFloat((float)iter.getValue());
@@ -140,16 +140,6 @@ public class ESAAnalyzeSelf {
 	}
 	
 	private static void Init(String baseFilename) throws SQLException, ClassNotFoundException, IOException {
-		// Reset 2nd order vectors table
-		System.out.println("Preparing tables...");
-		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
-		stmt.execute("DROP TABLE IF EXISTS concept_esa_vectors");
-		stmt.execute("CREATE TABLE concept_esa_vectors (" +
-				"id INT(10)," +
-				"vector MEDIUMBLOB " +
-				") DEFAULT CHARSET=binary");
-		stmt.close();
-		
 		System.out.println("in-memory cache tables...");
 		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
 		TermQueryOptimizer.getInstance().loadAll();
@@ -164,6 +154,16 @@ public class ESAAnalyzeSelf {
 	}
 	
 	private static void Finish(String baseFilename) throws IOException, SQLException {
+		// Reset 2nd order vectors table
+		System.out.println("Preparing tables...");
+		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
+		stmt.execute("DROP TABLE IF EXISTS concept_esa_vectors");
+		stmt.execute("CREATE TABLE concept_esa_vectors (" +
+				"id INT(10)," +
+				"vector MEDIUMBLOB " +
+				") DEFAULT CHARSET=binary");
+		stmt.close();
+
 		System.out.println("move data from tmp file to db...");
 		PreparedStatement pstmtWrite = WikiprepESAdb.getInstance().getConnection().prepareStatement(strVectorInsert);
 		// Read data from file to DB (note this cannot be done using LOAD DATA IN FILE
@@ -209,7 +209,7 @@ public class ESAAnalyzeSelf {
 		System.out.println("total articles loaded to db: " + c); 
 		
 		System.out.println("Adding primary key to table");
-		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
+		stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
 		stmt.execute("ALTER TABLE concept_esa_vectors " +
 				"CHANGE COLUMN id id INT(10) NOT NULL," +
 				"ADD PRIMARY KEY (id)");

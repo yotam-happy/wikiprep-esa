@@ -2,7 +2,6 @@ package edu.wiki.util;
 
 public class MinHeap {
     private int[] heapIndex;
-    private int[] heapSource;
     private double[] heapValue;
     private int size;
     private int maxsize;
@@ -14,9 +13,8 @@ public class MinHeap {
         this.maxsize = maxsize;
         this.size = 0;
         heapIndex = new int[this.maxsize + 1];
-        heapSource = new int[this.maxsize + 1];
         heapValue = new double[this.maxsize + 1];
-        heapIndex[0] = Integer.MIN_VALUE;
+        heapValue[0] = Double.MIN_VALUE;
     }
  
     private static int parent(int pos)
@@ -49,42 +47,39 @@ public class MinHeap {
         heapIndex[fpos] = heapIndex[spos];
         heapIndex[spos] = tmpIndex;
 
-        int tmpSource = heapSource[fpos];
-        heapSource[fpos] = heapSource[spos];
-        heapSource[spos] = tmpSource;
-
         double tmpValue = heapValue[fpos];
         heapValue[fpos] = heapValue[spos];
         heapValue[spos] = tmpValue;
     }
  
-    private void maxHeapify(int pos)
+    private void heapify(int pos)
     {
-        if (!isLeaf(pos))
+        if (pos <= size)
         {
-            if ( heapIndex[pos] > heapIndex[leftChild(pos)]  || heapIndex[pos] > heapIndex[rightChild(pos)])
+            if ( (leftChild(pos) <= size && heapValue[pos] > heapValue[leftChild(pos)])  || 
+            		(rightChild(pos) <= size && heapValue[pos] > heapValue[rightChild(pos)]))
             {
-                if (heapIndex[leftChild(pos)] < heapIndex[rightChild(pos)])
+                if ((!(rightChild(pos) <= size)) || heapValue[leftChild(pos)] < heapValue[rightChild(pos)])
                 {
                     swap(pos, leftChild(pos));
-                    maxHeapify(leftChild(pos));
+                    heapify(leftChild(pos));
                 }else
                 {
                     swap(pos, rightChild(pos));
-                    maxHeapify(rightChild(pos));
+                    heapify(rightChild(pos));
                 }
             }
         }
     }
  
-    public void insert(int index, int source, double value)
+    public void insert(int index, double value)
     {
-        heapIndex[++size] = index;
-        heapSource[++size] = source;
-        heapValue[++size] = value;
+    	size++;
+        heapIndex[size] = index;
+        heapValue[size] = value;
         int current = size;
  
-        while(heapIndex[current] < heapIndex[parent(current)])
+        while(heapValue[current] < heapValue[parent(current)])
         {
             swap(current,parent(current));
             current = parent(current);
@@ -93,29 +88,31 @@ public class MinHeap {
  
     public void remove()
     {
-        heapIndex[FRONT] = heapIndex[size--]; 
-        heapSource[FRONT] = heapSource[size--]; 
-        heapValue[FRONT] = heapValue[size--]; 
-        maxHeapify(FRONT);
+        heapIndex[FRONT] = heapIndex[size]; 
+        heapValue[FRONT] = heapValue[size];
+        size--;
+        heapify(FRONT);
+    }
+    
+    public void insertAtFront(int index, double value) {
+    	if (value <= heapValue[FRONT]) {
+    		return;
+    	}
+    	heapIndex[FRONT] = index;
+    	heapValue[FRONT] = value;
+    	heapify(FRONT);
     }
 
     public int peekIndex() {
     	return getIndex(FRONT);
     }
 
-    public int peekSource() {
-    	return getSource(FRONT);
-    }
-    
     public double peekValue() {
     	return getValue(FRONT);
     }
     
     public int getIndex(int i) {
     	return heapIndex[i];
-    }
-    public int getSource(int i) {
-    	return heapSource[i];
     }
     public double getValue(int i) {
     	return heapValue[i];

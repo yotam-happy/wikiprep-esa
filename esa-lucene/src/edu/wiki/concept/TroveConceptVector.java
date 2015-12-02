@@ -1,13 +1,13 @@
 package edu.wiki.concept;
 
+import java.io.Serializable;
+
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.api.concept.IConceptVectorData;
 import gnu.trove.TDoubleProcedure;
 import gnu.trove.TIntDoubleHashMap;
 import gnu.trove.TIntDoubleIterator;
-
-import java.io.Serializable;
 
 public class TroveConceptVector implements IConceptVector, Serializable {
 
@@ -57,6 +57,10 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 	@Override
 	public IConceptIterator orderedIterator() {
 		return new TroveConceptVectorOrderedIterator( valueMap );
+	}
+	
+	public IConceptIterator bestKOrderedIterator(int nConcepts) {
+		return new TroveBestKOrderedIterator(valueMap, nConcepts);
 	}
 
 	@Override

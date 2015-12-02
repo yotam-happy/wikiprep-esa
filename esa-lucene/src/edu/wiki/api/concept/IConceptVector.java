@@ -21,4 +21,5 @@ public interface IConceptVector {
 	public int count();
 	
 	public IConceptIterator orderedIterator();
+	public IConceptIterator bestKOrderedIterator(int nConcepts);
 }

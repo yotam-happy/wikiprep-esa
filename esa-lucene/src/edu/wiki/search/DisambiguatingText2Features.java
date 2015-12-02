@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.stream.Stream;
 
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
@@ -17,8 +18,11 @@ import edu.wiki.util.db.ArticleQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 
 public class DisambiguatingText2Features {
-	public static final int CONTEXT_SIZE = 10;
-	public static final int MAX_NGRAM = 3;
+	public static final int MIN_CONTEXT_SZ = 15;
+	public static final int MAX_CONTEXT_CONCEPTS_TO_KEEP = 1000;
+	public static final int MAX_NGRAM = 4; // Low MAX_NGRAM can match only articles with short titles. These can be
+											// assumed the more general concepts and therefore the more important ones
+											// so the accuracy loss might be worth the speed gain.
 	public static final double MATCH_CUTOFF = 0.01;
 	ESASearcher searcher;
 	ArticleQueryOptimizer articleQueryOptimizer;
@@ -36,76 +40,89 @@ public class DisambiguatingText2Features {
 		return result;
 	}
 	
-	public Map<Integer, Double> getDisambiguatingFeatures(String doc) throws IOException {
-		Map<Integer, Double> result = new HashMap<>();
-		ArrayList<String> tokens = new ArrayList<>();
-
-		// Tokenize
-		TokenStream ts = searcher.analyzer.tokenStream("contents",new StringReader(doc));
-        try {
-			while (ts.incrementToken()) { 
-	            TermAttribute t = ts.getAttribute(TermAttribute.class);
-	            tokens.add(t.term());
-			}
-		} catch (IOException e) {
-			throw new RuntimeException(e);
+	static int c = 0;
+	static int d = 0;
+	static int g = 0;
+	public static synchronized void dod() {
+		if(c % 500 == 0) {
+			System.out.println("disambiguation features per article: " + ((double)d / c) + " relative: " + ((double)d / g));
 		}
+	}
+	
+	public Map<Integer, Double> getDisambiguatingFeatures(Stream<String> contexts) throws IOException {
+		Map<Integer, Double> result = new HashMap<>();
+		c++;
+		contexts.forEach((context) -> {
+			ArrayList<String> tokens = new ArrayList<>();
+			// Tokenize
+			TokenStream ts = searcher.analyzer.tokenStream("contents",new StringReader(context));
+	        try {
+				while (ts.incrementToken()) { 
+					g++;
+		            TermAttribute t = ts.getAttribute(TermAttribute.class);
+		            tokens.add(t.term());
+				}
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
 
-        if (tokens.size() < CONTEXT_SIZE / 2) {
-        	// Can't reliably disambiguate anything
-        	return result;
-        }
-        // Disambiguate starting on each word
-        for(int i = 0; i < tokens.size(); i++) {
-        	// bias to context to the front of the inspected ngram
-        	int contextStart = i - CONTEXT_SIZE / 4 < 0 ? 0 : i - CONTEXT_SIZE / 4;
-        	int contextEnd = contextStart + CONTEXT_SIZE > tokens.size() ? tokens.size() : contextStart + CONTEXT_SIZE;
-        	if (contextEnd < CONTEXT_SIZE) {
-        		contextStart = 0;
-        	}
-        	StringBuffer context = new StringBuffer();
-        	for (int j = contextStart; j < contextEnd; j++){
-        		if (j != i) {
-        			context.append(tokens.get(j)).append(' ');
-        		}
-        	}
-        	// Get word to context similarity (should use getCombinedVector but
-        	// having performance issues
-        	IConceptVector contextVec = searcher.getConceptVector(context.toString());
-        	
-        	// find possible concepts for disambiguation
-        	Set<String> candidates = new HashSet<>();
-        	StringBuffer sbCandidate = new StringBuffer();
-        	sbCandidate.append("$");
-        	for(int j = i; j < i + MAX_NGRAM && j < tokens.size(); j ++) {
-        		sbCandidate.append('_');
-        		sbCandidate.append(tokens.get(j));
-        		candidates.add(sbCandidate.toString());
-        	}
-        	Map<String, Set<Integer>> candidatesIds = articleQueryOptimizer.doQuery(candidates);
-        	
-        	// Get candidates
-        	Map<Integer, Double> candidatesScores = new HashMap<>();
-        	candidatesIds.forEach((name,ids) -> {
-        		ids.forEach((id -> {
-            		try {
-    					IConceptVector vec = searcher.getConceptESAVector(id);
-    					candidatesScores.put(id, searcher.getRelatedness(contextVec, vec));
-    				} catch (Exception e) {
-    					throw new RuntimeException(e);
-    				}
-        		}));
-        	});
-        	
-        	// choose best candidate
-        	Entry<Integer, Double> best = candidatesScores.entrySet().stream()
-        			.max((e1,e2)->e1.getValue().compareTo(e2.getValue())).orElse(null);
-        	if (best != null && best.getValue() > MATCH_CUTOFF) {
-        		result.put(best.getKey(), 
-        				1 + (result.containsKey(best.getKey()) ? result.get(best.getKey()) : 0) );
-        	}
-        }
-        
+	        if (tokens.size() < MIN_CONTEXT_SZ) {
+	        	// can't reliably disambiguate anything
+	        	return;
+	        }
+			
+        	IConceptVector contextVec;
+			try {
+				contextVec = searcher.getNormalVector(searcher.getConceptVector(context), MAX_CONTEXT_CONCEPTS_TO_KEEP);
+				
+			} catch (Exception e3) {
+				throw new RuntimeException(e3);
+			}
+
+			if (contextVec == null) {
+				return;
+			}
+			// Disambiguate starting on each word
+	        for(int i = 0; i < tokens.size(); i++) {
+	        	// find possible candidates for disambiguation
+	        	Set<String> candidates = new HashSet<>();
+	        	StringBuffer sbCandidate = new StringBuffer();
+	        	sbCandidate.append("$");
+	        	for(int j = i; j < i + MAX_NGRAM && j < tokens.size(); j ++) {
+	        		sbCandidate.append('_');
+	        		sbCandidate.append(tokens.get(j));
+	        		candidates.add(sbCandidate.toString());
+	        	}
+	        	Map<String, Set<Integer>> candidatesIds = articleQueryOptimizer.doQuery(candidates);
+
+	        	if (candidatesIds.isEmpty()) {
+	        		continue;
+	        	}
+	        	
+	        	// Get candidate scores
+	        	Map<Integer, Double> candidatesScores = new HashMap<>();
+	        	candidatesIds.forEach((name,ids) -> {
+	        		ids.forEach((id -> {
+	            		try {
+	    					IConceptVector vec = searcher.getConceptESAVector(id);
+	    					candidatesScores.put(id, searcher.getRelatedness(contextVec, vec));
+	    				} catch (Exception e) {
+	    					throw new RuntimeException(e);
+	    				}
+	        		}));
+	        	});
+	        	
+	        	// choose best candidate
+	        	Entry<Integer, Double> best = candidatesScores.entrySet().stream()
+	        			.max((e1,e2)->e1.getValue().compareTo(e2.getValue())).orElse(null);
+	        	if (best != null && best.getValue() > MATCH_CUTOFF) {
+					d++;
+	        		result.put(best.getKey(), 
+	        				1 + (result.containsKey(best.getKey()) ? result.get(best.getKey()) : 0) );
+	        	}
+	        }
+		});
+		dod();
 		return result;
 	}
 }
