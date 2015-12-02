@@ -32,15 +32,6 @@ public class MinHeap {
         return (2 * pos) + 1;
     }
  
-    private boolean isLeaf(int pos)
-    {
-        if (pos >=  (size / 2)  &&  pos <= size)
-        {
-            return true;
-        }
-        return false;
-    }
- 
     private void swap(int fpos,int spos)
     {
         int tmpIndex = heapIndex[fpos];

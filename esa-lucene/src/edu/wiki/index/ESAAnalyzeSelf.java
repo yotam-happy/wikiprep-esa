@@ -116,6 +116,11 @@ public class ESAAnalyzeSelf {
 					    		count++;
 					    	}
 						} catch(Exception e) {
+							try {
+								dos.close();
+							} catch (IOException e2) {
+								throw new RuntimeException(e2);
+							}
 							throw new RuntimeException(e);
 						}
 					});
