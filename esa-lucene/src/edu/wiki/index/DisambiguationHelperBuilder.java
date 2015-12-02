@@ -93,7 +93,6 @@ public class DisambiguationHelperBuilder {
 							Map<Integer, Double > features = 
 									disambiguatingText2Features.getDisambiguatingFeatures(contexts.stream());
 							if (features.isEmpty()) {
-								dos.close();
 								return;
 							}
 							
@@ -104,7 +103,7 @@ public class DisambiguationHelperBuilder {
 					    	features.entrySet().forEach((e) -> {
 								try {
 						    		dos.writeInt(e.getKey());
-						    		dos.writeDouble(e.getValue());
+						    		dos.writeFloat(e.getValue().floatValue());
 								} catch(Exception e2) {
 									throw new RuntimeException(e2);
 								}
@@ -126,10 +125,7 @@ public class DisambiguationHelperBuilder {
 			System.out.println("articles analyzed: " + c + ", avg: " + rate + " articles per minute (" 
 					+ byteswritten + " bytes written)");
 		}
-		
 		System.out.println("total articles analyzed: " + c); 
-
-		
 	}
 	
 	private static void Init(String baseFilename) throws SQLException, ClassNotFoundException, IOException {
