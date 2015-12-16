@@ -7,6 +7,8 @@ import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -21,10 +23,12 @@ import java.util.stream.Stream;
  */
 public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	private Map<K, V> cache;
+	private Map<K, V> cacheNonExisting;
 	private final String query;
 	private PreparedStatement pstmt;
 
-	private int maxCacheEntries = 1000;
+	private int maxCacheEntries = 250000;
+	private int maxCacheNonExistingEntries = 500000;
 	private int maxSelectGrouping = 100;
 
 	private long cache_hits = 0;
@@ -43,6 +47,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 */
 	public AbstractDBQueryOptimizer(String query) {
 		cache = new THashMap<K,V>();
+		cacheNonExisting = new THashMap<K,V>();
 		this.query = query;
 		// initializes pstmt
 		setMaxSelectGrouping(maxSelectGrouping);
@@ -82,18 +87,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	}
 	
 	public V doQuery(K key) {
-		if ((!getNoCacheMode()) && cache.containsKey(key)) {
-			cache_hits += 1;
-			return cache.get(key);
-		} else {
-			if (getAllLoadedMode()) {
-				return null;
-			}
-			// if not in cache, and not allLoadedMode, do query
-			cache_misses += 1;
-			setKeyInPstmt(pstmt, 0, key);
-			return executePstmt().get(key);
-		}
+		return doQuery(new HashSet<K>(Arrays.asList(key))).get(key);
 	}
 	
 	public THashMap<K,V> doQuery(Set<K> keys) {
@@ -103,9 +97,12 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		int count = 0;
 		for (K key : keys) {
 			// if in cache add directly to results
-			if ((!getNoCacheMode()) && cache.containsKey(key)) {
+			if ((!getNoCacheMode()) && (cache.containsKey(key) || cacheNonExisting.containsKey(key))) {
 				cache_hits += 1;
-				result.put(key, cache.get(key));
+				V v = cache.get(key);
+				if (v != null) {
+					result.put(key, v);
+				}
 			} else {
 				if (getAllLoadedMode()) {
 					break;
@@ -128,6 +125,15 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 			}
 			result.putAll(executePstmt());
 		}
+		
+		// Update cache
+		keys.forEach((k) -> addToCache(k, result.get(k)));
+
+		try {
+			pstmt.clearParameters();
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 		return result;
 	}
 	
@@ -141,7 +147,6 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	        	K k = getKeyFromRs(rs);
 	        	V v = getValueFromRs(rs, res.get(k));
 	        	res.put(k, v);
-	        	addToCache(k, v);
 	        }
 			return res;
 		}catch(SQLException e) {
@@ -169,12 +174,37 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 			cache.remove(keyToRemove);
 		}
 	}
+	private void evacuateFromCacheNonExisting() {
+		if (getNoCacheMode()) {
+			return;
+		}
+		// If cache is full then remove one element.
+		// maybe someday i need to change this ugly little random 
+		// evacuation policy to something more meaningful...
+		while (cacheNonExisting.size() >= maxCacheNonExistingEntries) {
+			int toRemove = (int)(Math.random() * cacheNonExisting.size());
+			K keyToRemove = null;
+			for(K tmp : cacheNonExisting.keySet()) {
+				keyToRemove = tmp;
+				toRemove--;
+				if (toRemove == 0) {
+					break;
+				}
+			}
+			cacheNonExisting.remove(keyToRemove);
+		}
+	}
 	private void addToCache(K k, V v) {
 		if (getNoCacheMode()) {
 			return;
 		}
-		evacuateFromCache();
-		cache.put(k, v);
+		if (v != null) {
+			evacuateFromCache();
+			cache.put(k, v);
+		} else {
+			evacuateFromCacheNonExisting();
+			cacheNonExisting.put(k, null);
+		}
 	}
 
 	public void setMaxSelectGrouping(int maxSelectGrouping) {
