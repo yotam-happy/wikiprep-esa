@@ -1,22 +1,8 @@
 package edu.wiki.search;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
-
-
-
-
-
-import org.apache.lucene.analysis.CustomTokenizer;
-import org.apache.lucene.analysis.tokenattributes.TermAttribute;
-
-
-
-
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
@@ -35,7 +21,7 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 
 	public static final int LARGE_WINDOW_OF_WORDS_WIDTH = 150;
 	public static final int WINDOW_OF_WORDS_WIDTH = 15;
-	public static final int CONCEPTS_PER_SHORT_CONTEXT = 5;
+	public static final int CONCEPTS_PER_SHORT_CONTEXT = 2;
 	public static final int CONCEPTS_PER_MED_CONTEXT = 10;
 	public static final int CONCEPTS_PER_LONG_CONTEXT = 25;
 	
@@ -50,13 +36,13 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		getConceptVectorUsingMultiResolutionInternal(doc, use2ndOrder, CONCEPTS_PER_LONG_CONTEXT, result);
 
 		// get concepts from analyzing paragraphs (approximated by using large window of words contexts)
-		Collection<String> paragraphs = getWindowOfWordsContexts(Arrays.asList(doc), LARGE_WINDOW_OF_WORDS_WIDTH);
+		Collection<String> paragraphs = WikiprepESAUtils.getWindowOfWordsContexts(Arrays.asList(doc), LARGE_WINDOW_OF_WORDS_WIDTH, 0);
 		paragraphs.forEach((paragraph) -> {
 			getConceptVectorUsingMultiResolutionInternal(paragraph, use2ndOrder, CONCEPTS_PER_MED_CONTEXT, result);
 		});
 
 		// get concepts from analyzing window of words contexts (within paragraphs)
-		getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH).forEach((wow) -> {
+		WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
 			getConceptVectorUsingMultiResolutionInternal(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
 		});
 		
@@ -84,7 +70,7 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		});
 
 		// get concepts from analyzing window of words contexts (within paragraphs
-		getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH).forEach((wow) -> {
+		WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
 			getConceptVectorUsingMultiResolutionInternal(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
 		});
 		
@@ -126,32 +112,4 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		}
 	}
 	
-	public Set<String> getWindowOfWordsContexts(Collection<String> largerContexts, int sz) {
-		Set<String> result = new HashSet<String>();
-
-		largerContexts.forEach((context) -> {
-			try {
-				CustomTokenizer wordTokenizer = new CustomTokenizer(new StringReader(context));
-	
-				StringBuffer window = new StringBuffer();
-				int count = 0;
-				while (wordTokenizer.incrementToken()) {
-					window.append(" ").append(wordTokenizer.getAttribute(TermAttribute.class).term());
-					count++;
-					if (count >= sz) {
-						result.add(window.toString());
-						window = new StringBuffer();
-						count = 0;
-					}
-				}
-				if (count > 0) {
-					result.add(window.toString());
-				}
-				wordTokenizer.close();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		});
-		return result;
-	}
 }

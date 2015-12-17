@@ -19,7 +19,6 @@ import edu.wiki.search.DisambiguatingText2Features;
 import edu.wiki.util.Tuple;
 import edu.wiki.util.WikiprepESAUtils;
 import edu.wiki.util.WikiprepESAdb;
-import edu.wiki.util.db.ArticleQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
@@ -91,7 +90,7 @@ public class DisambiguationHelperBuilder {
 							// get disambiguation contexts
 							Collection<String> contexts = WikiprepESAUtils.getWikipediaDocumentParagraph(tuple.y);
 							Map<Integer, Double > features = 
-									disambiguatingText2Features.getDisambiguatingFeatures(contexts.stream());
+									disambiguatingText2Features.getDisambiguatingFeatures(contexts.stream(),0);
 							if (features.isEmpty()) {
 								return;
 							}
@@ -137,8 +136,6 @@ public class DisambiguationHelperBuilder {
 		IdfQueryOptimizer.getInstance().loadAll();
 		System.out.println("loading ConceptESAVectorQueryOptimizer");
 		ConceptESAVectorQueryOptimizer.getInstance().loadAll();
-		System.out.println("loading ArticleQueryOptimizer");
-		ArticleQueryOptimizer.getInstance().loadAll();
 		
 		for (int i = 0; i < THREADS; i++) {
 			File f = new File(baseFilename + i);

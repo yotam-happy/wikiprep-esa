@@ -278,6 +278,16 @@ public class ESASearcher {
 		return cvNormal;
 	}
 	
+	public IConceptVector getConceptESAVector(byte[] vec) throws IOException {
+		TermVectorIterator tvi = new TermVectorIterator(vec);
+		IConceptVector result = new TroveConceptVector(tvi.getVectorLen());
+		while(tvi.next()) {
+			result.set(tvi.getConceptId(), 
+					tvi.getConceptScore());
+		}
+		return result;
+	}
+	
 	public IConceptVector getConceptESAVector(int conceptId) throws IOException {
 		Map<Integer,byte[]> map = ConceptESAVectorQueryOptimizer.getInstance()
 				.doQuery(new HashSet<Integer>(Arrays.asList(conceptId)));
@@ -286,13 +296,7 @@ public class ESASearcher {
 			return null;
 		}
 
-		TermVectorIterator tvi = new TermVectorIterator(map.get(conceptId));
-		IConceptVector result = new TroveConceptVector(tvi.getVectorLen());
-		while(tvi.next()) {
-			result.set(tvi.getConceptId(), 
-					tvi.getConceptScore());
-		}
-		return result;
+		return getConceptESAVector(map.get(conceptId));
 	}
 	
 	public double getRelatedness(IConceptVector v1, IConceptVector v2){
