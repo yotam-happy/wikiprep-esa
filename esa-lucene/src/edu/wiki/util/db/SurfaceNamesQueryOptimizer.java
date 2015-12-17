@@ -9,18 +9,18 @@ import java.util.Set;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
-public class ArticleQueryOptimizer extends AbstractDBQueryOptimizer<String, Set<Integer>>{
-	private static ArticleQueryOptimizer articleQueryOptimizer;
+public class SurfaceNamesQueryOptimizer extends AbstractDBQueryOptimizer<String, Set<Integer>>{
+	private static SurfaceNamesQueryOptimizer articleQueryOptimizer;
 	
-	public static ArticleQueryOptimizer getInstance() {
+	public static SurfaceNamesQueryOptimizer getInstance() {
 		if (articleQueryOptimizer == null) {
-			articleQueryOptimizer = new ArticleQueryOptimizer();
+			articleQueryOptimizer = new SurfaceNamesQueryOptimizer();
 		}
 		return articleQueryOptimizer;
 	}
 
-	private ArticleQueryOptimizer() {
-		super("SELECT title_processed, id FROM article WHERE title_processed IN (?)");
+	private SurfaceNamesQueryOptimizer() {
+		super("SELECT name, concept_id FROM surface_names WHERE name IN (?)");
 	}
 
 	@Override
@@ -54,6 +54,6 @@ public class ArticleQueryOptimizer extends AbstractDBQueryOptimizer<String, Set<
 
 	@Override
 	protected String getLoadAllQuery() {
-		return "SELECT title_processed, id FROM article";
+		return "SELECT name, concept_id FROM surface_names";
 	}
 }
