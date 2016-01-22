@@ -51,7 +51,7 @@ public class IdfQueryOptimizer extends AbstractDBQueryOptimizer<String, Float> {
 	}
 
 	@Override
-	protected String getLoadAllQuery() {
+	public String getLoadAllQuery() {
 		return "SELECT t.term, t.idf FROM terms t";
 	}
 

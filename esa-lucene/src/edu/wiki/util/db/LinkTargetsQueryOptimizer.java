@@ -54,7 +54,7 @@ public class LinkTargetsQueryOptimizer extends AbstractMultiResultDBQueryOptimiz
 	}
 
 	@Override
-	protected String getLoadAllQuery() {
+	public String getLoadAllQuery() {
 		return "SELECT source_id, target_id FROM pagelinks";
 	}
 

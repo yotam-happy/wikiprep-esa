@@ -36,4 +36,39 @@ public class ConceptVectorSimilarity {
 		return m_scorer.getScore();
 	}
 	
+	public double calcSimilarityFast( ArrayListConceptVector v0, ArrayListConceptVector v1 ) {
+		m_scorer.reset( v0.getData(), v1.getData(), 1 );
+		
+		// when dealing with ArrayListConceptVector we are guarenteed the
+		// concepts are sorted by id
+		IConceptIterator it0 = v0.iterator();
+		IConceptIterator it1 = v1.iterator();
+		if ((!it0.next())||(!it1.next())) {
+			return 0;
+		}
+		boolean done = false;
+		while(!done) {
+			if (it0.getId() == it1.getId()) {
+				m_scorer.addConcept( it0.getId(), it0.getValue(), it1.getId(), it1.getValue(), 1);
+				done = (!it0.next()) || (!it1.next());
+			} else {
+				done = it0.getId() < it1.getId() ? !it0.next() : !it1.next();
+			}
+		}
+		
+		m_scorer.finalizeScore( v0.getData(), v1.getData() );
+		
+		return m_scorer.getScore();
+	}
+	
+	/**
+	 * Assumes vector is normalized!!
+	 */
+	public double calcCosineDistanceFast( ArrayListConceptVector v0, ArrayListConceptVector v1 ) {
+		return Math.abs(Math.acos(calcSimilarityFast(v0, v1)));
+	}
+	
+	public double calcCosineDistance( IConceptVector v0, IConceptVector v1 ) {
+		return Math.abs(Math.acos(calcSimilarity(v0, v1)));
+	}
 }

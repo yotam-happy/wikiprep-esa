@@ -19,12 +19,12 @@ import edu.wiki.util.db.SurfaceNamesQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 
 public class DisambiguatingText2Features {
-	public static final int MIN_CONTEXT_SZ = 15;
+	public static final int MIN_CONTEXT_SZ = 5;
 	public static final int MAX_CONTEXT_CONCEPTS_TO_KEEP = 1000;
 	public static final int MAX_NGRAM = 2; // Low MAX_NGRAM can match only articles with short titles. These can be
 											// assumed the more general concepts and therefore the more important ones
 											// so the accuracy loss might be worth the speed gain.
-	public static final double MATCH_CUTOFF = 0.01;
+	public static final double MATCH_CUTOFF = 0.02;
 	ESASearcher searcher;
 	SurfaceNamesQueryOptimizer articleQueryOptimizer;
 	ConceptESAVectorQueryOptimizer conceptESAVectorQueryOptimizer;
@@ -135,16 +135,26 @@ public class DisambiguatingText2Features {
 	        	
 	        	if (best != null && best.getValue() > MATCH_CUTOFF) {
 	        		result.put(best.getKey(), 
-	        				1 + (result.containsKey(best.getKey()) ? result.get(best.getKey()) : 0) );
+	        				2 + (result.containsKey(best.getKey()) ? result.get(best.getKey()) : 0) );
 					d++;
-
+					
+					StringBuffer sb = new StringBuffer();
+					candidatesIds.forEach((n,ids)->{
+						ids.forEach((id)->{
+							if (id==best.getKey()){
+								sb.append(n + ";");
+							}
+						});
+					});
+					System.out.println("got concept: " + best.getKey() + " score: " + best.getValue() + " (" + sb.toString() + ")");
+					
 					// another option:
-/*					candidatesScores.entrySet().stream().filter((e)->e.getValue() > best.getValue() / 2)
+					candidatesScores.entrySet().stream().filter((e)->e.getValue() > best.getValue() / 2)
 	        				.forEach((e)->{
 	        	        		result.put(e.getKey(), 
 	        	        				1 + (result.containsKey(e.getKey()) ? result.get(e.getKey()) : 0) );
 	        					d++;
-	        				});*/	
+	        				});
 	        	}
 	        }
 		});

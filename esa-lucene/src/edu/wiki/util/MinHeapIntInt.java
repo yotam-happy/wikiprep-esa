@@ -1,20 +1,20 @@
 package edu.wiki.util;
 
-public class MinHeap {
+public class MinHeapIntInt {
     private int[] heapIndex;
-    private double[] heapValue;
+    private int[] heapValue;
     private int size;
     private int maxsize;
  
     private static final int FRONT = 1;
  
-    public MinHeap(int maxsize)
+    public MinHeapIntInt(int maxsize)
     {
         this.maxsize = maxsize;
         this.size = 0;
         heapIndex = new int[this.maxsize + 1];
-        heapValue = new double[this.maxsize + 1];
-        heapValue[0] = Double.MIN_VALUE;
+        heapValue = new int[this.maxsize + 1];
+        heapValue[0] = Integer.MIN_VALUE;
     }
  
     private static int parent(int pos)
@@ -38,7 +38,7 @@ public class MinHeap {
         heapIndex[fpos] = heapIndex[spos];
         heapIndex[spos] = tmpIndex;
 
-        double tmpValue = heapValue[fpos];
+        int tmpValue = heapValue[fpos];
         heapValue[fpos] = heapValue[spos];
         heapValue[spos] = tmpValue;
     }
@@ -63,7 +63,7 @@ public class MinHeap {
         }
     }
  
-    public void insert(int index, double value)
+    public void insert(int index, int value)
     {
     	size++;
         heapIndex[size] = index;
@@ -85,7 +85,7 @@ public class MinHeap {
         heapify(FRONT);
     }
     
-    public void insertAtFront(int index, double value) {
+    public void insertAtFront(int index, int value) {
     	if (value <= heapValue[FRONT]) {
     		return;
     	}
@@ -98,14 +98,14 @@ public class MinHeap {
     	return getIndex(FRONT);
     }
 
-    public double peekValue() {
+    public int peekValue() {
     	return getValue(FRONT);
     }
     
     public int getIndex(int i) {
     	return heapIndex[i];
     }
-    public double getValue(int i) {
+    public int getValue(int i) {
     	return heapValue[i];
     }
     

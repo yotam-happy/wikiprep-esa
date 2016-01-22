@@ -52,7 +52,7 @@ public class ConceptESAVectorQueryOptimizer extends AbstractDBQueryOptimizer<Int
 	}
 
 	@Override
-	protected String getLoadAllQuery() {
+	public String getLoadAllQuery() {
 		return "SELECT id, vector FROM concept_esa_vectors";
 	}
 }

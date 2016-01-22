@@ -6,20 +6,12 @@ import java.sql.SQLException;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
-public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Integer> {
-
-	private static InlinkQueryOptimizer inlinkQueryOptimizer;
+public class AbstractClusterCentroidQueryOptimizer extends AbstractDBQueryOptimizer<Integer, byte[]>{
+	private String tableName;
 	
-	public static InlinkQueryOptimizer getInstance() {
-		if (inlinkQueryOptimizer == null) {
-			inlinkQueryOptimizer = new InlinkQueryOptimizer();
-		}
-		return inlinkQueryOptimizer;
-	}
-
-	private InlinkQueryOptimizer() {
-		super("SELECT i.target_id, i.inlink FROM inlinks i WHERE i.target_id IN (?)");
-		setMaxCachEntries(100000);
+	protected AbstractClusterCentroidQueryOptimizer(String tableName) {
+		super("SELECT id, vector FROM " + tableName + " WHERE id IN (?)");
+		this.tableName = tableName;
 	}
 
 	@Override
@@ -36,9 +28,9 @@ public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Inte
 	}
 
 	@Override
-	protected Integer getValueFromRs(ResultSet rs, Integer oldValue) {
+	protected byte[] getValueFromRs(ResultSet rs, byte[] oldValue) {
 		try {
-			return rs.getInt(2);
+			return rs.getBytes(2);
 		} catch (SQLException e) {
 			throw new RuntimeException(e);
 		}
@@ -55,7 +47,8 @@ public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Inte
 
 	@Override
 	public String getLoadAllQuery() {
-		return "SELECT i.target_id, i.inlink FROM inlinks i";
+		return "SELECT id, vector FROM " + tableName;
 	}
+
 
 }

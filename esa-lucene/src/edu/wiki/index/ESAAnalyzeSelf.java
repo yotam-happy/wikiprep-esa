@@ -60,7 +60,6 @@ public class ESAAnalyzeSelf {
 		stmt.setFetchSize(Integer.MIN_VALUE);
 		
 		int c = 0;
-		long byteswritten = 0;
 		stmt.execute("SELECT old_id, old_text FROM text");
 		ResultSet rs = stmt.getResultSet();
 		Instant start = Instant.now();
@@ -97,13 +96,13 @@ public class ESAAnalyzeSelf {
 
 					task.tuples.stream().forEach((tuple) -> {
 						try {
-							// Dont use short contexts because my computer is too slow....
-							IConceptVector vector = searcher.getConceptVectorUsingMultiResolution(tuple.y, 1000, false, true);
+							// Dont use second order....
+							IConceptVector vector = searcher.getConceptVectorUsingMultiResolutionForWikipedia(tuple.y, 1000, true, false);
 							
 							// write concept id
 							dos.writeInt(tuple.x);
 							// prune this vector at 1000
-					    	int max = vector.size() < MAX_TERMS_PER_VECTOR ? vector.size() : MAX_TERMS_PER_VECTOR; 
+					    	int max = vector.count() < MAX_TERMS_PER_VECTOR ? vector.count() : MAX_TERMS_PER_VECTOR; 
 					    	// write vector
 					    	dos.writeInt(max);
 					    	int count = 0;
@@ -134,12 +133,10 @@ public class ESAAnalyzeSelf {
 			
 	    	Duration dur = Duration.between(start, Instant.now());
 	    	double rate = (double)c / ((double)dur.get(ChronoUnit.SECONDS) / 60.0);
-			System.out.println("articles transformed: " + c + ", avg: " + rate + " articles per minute (" 
-					+ byteswritten + " bytes written)");
+			System.out.println("articles transformed: " + c + ", avg: " + rate);
 		}
 		
 		System.out.println("total articles transformed: " + c); 
-
 		Finish(baseFileName);
 		
 	}
@@ -169,6 +166,7 @@ public class ESAAnalyzeSelf {
 				") DEFAULT CHARSET=binary");
 		stmt.close();
 
+		WikiprepESAdb.getInstance().getConnection().setAutoCommit(false);
 		System.out.println("move data from tmp file to db...");
 		PreparedStatement pstmtWrite = WikiprepESAdb.getInstance().getConnection().prepareStatement(strVectorInsert);
 		// Read data from file to DB (note this cannot be done using LOAD DATA IN FILE
@@ -212,14 +210,15 @@ public class ESAAnalyzeSelf {
 			fis.close();
 		}
 		System.out.println("total articles loaded to db: " + c); 
-		
+
+		WikiprepESAdb.getInstance().getConnection().commit();
+		WikiprepESAdb.getInstance().getConnection().setAutoCommit(true);
 		System.out.println("Adding primary key to table");
 		stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
 		stmt.execute("ALTER TABLE concept_esa_vectors " +
 				"CHANGE COLUMN id id INT(10) NOT NULL," +
 				"ADD PRIMARY KEY (id)");
 		stmt.close();
-		WikiprepESAdb.getInstance().getConnection().commit();
 		WikiprepESAdb.getInstance().getConnection().close();
 	}
 }

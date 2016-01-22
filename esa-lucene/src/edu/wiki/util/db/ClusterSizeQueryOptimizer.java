@@ -6,19 +6,18 @@ import java.sql.SQLException;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
-public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Integer> {
-
-	private static InlinkQueryOptimizer inlinkQueryOptimizer;
+public class ClusterSizeQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Integer>{
+	private static ClusterSizeQueryOptimizer instance;
 	
-	public static InlinkQueryOptimizer getInstance() {
-		if (inlinkQueryOptimizer == null) {
-			inlinkQueryOptimizer = new InlinkQueryOptimizer();
+	public static ClusterSizeQueryOptimizer getInstance() {
+		if (instance == null) {
+			instance = new ClusterSizeQueryOptimizer();
 		}
-		return inlinkQueryOptimizer;
+		return instance;
 	}
 
-	private InlinkQueryOptimizer() {
-		super("SELECT i.target_id, i.inlink FROM inlinks i WHERE i.target_id IN (?)");
+	private ClusterSizeQueryOptimizer() {
+		super("SELECT id, size FROM cluster_lengths WHERE id IN (?)");
 		setMaxCachEntries(100000);
 	}
 
@@ -55,7 +54,7 @@ public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Inte
 
 	@Override
 	public String getLoadAllQuery() {
-		return "SELECT i.target_id, i.inlink FROM inlinks i";
+		return "SELECT t.term, t.idf FROM terms t";
 	}
 
 }

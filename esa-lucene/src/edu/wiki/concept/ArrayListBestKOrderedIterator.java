@@ -2,34 +2,27 @@ package edu.wiki.concept;
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.util.MinHeapIntDouble;
-import gnu.trove.TIntDoubleHashMap;
-import gnu.trove.TIntDoubleIterator;
 
-public class TroveBestKOrderedIterator implements IConceptIterator{
+public class ArrayListBestKOrderedIterator implements IConceptIterator{
 	private int[] ids;
 	private double[] values;
 	private int current;
 	 
-	public TroveBestKOrderedIterator( TIntDoubleHashMap valueMap, int nConcepts ) {
-		TIntDoubleIterator iter = valueMap.iterator();
-		
+	public ArrayListBestKOrderedIterator( int[] ids, double[] values, int sz,int nConcepts) {
 		MinHeapIntDouble heap = new MinHeapIntDouble(nConcepts);
-		int c = 0;
-		while (iter.hasNext()) {
-			iter.advance();
-			if (c < nConcepts) {
-				heap.insert(iter.key(), iter.value());
+		for(int i = 0; i < ids.length; i++){
+			if (i < nConcepts) {
+				heap.insert(ids[i], values[i]);
 			} else {
-				heap.insertAtFront(iter.key(), iter.value());
+				heap.insertAtFront(ids[i], values[i]);
 			}
-			c++;
 		}
 		
-		values = new double[heap.size()];
-		ids = new int[heap.size()];
+		this.values = new double[heap.size()];
+		this.ids = new int[heap.size()];
 		for (int i = heap.size() - 1; i >= 0; i--) {
-			values[i] = heap.peekValue();
-			ids[i] = heap.peekIndex();
+			this.values[i] = heap.peekValue();
+			this.ids[i] = heap.peekIndex();
 			heap.remove();
 		}
 		reset();

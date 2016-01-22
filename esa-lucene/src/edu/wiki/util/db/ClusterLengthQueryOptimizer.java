@@ -6,19 +6,18 @@ import java.sql.SQLException;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
-public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Integer> {
-
-	private static InlinkQueryOptimizer inlinkQueryOptimizer;
+public class ClusterLengthQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Double>{
+	private static ClusterLengthQueryOptimizer instance;
 	
-	public static InlinkQueryOptimizer getInstance() {
-		if (inlinkQueryOptimizer == null) {
-			inlinkQueryOptimizer = new InlinkQueryOptimizer();
+	public static ClusterLengthQueryOptimizer getInstance() {
+		if (instance == null) {
+			instance = new ClusterLengthQueryOptimizer();
 		}
-		return inlinkQueryOptimizer;
+		return instance;
 	}
 
-	private InlinkQueryOptimizer() {
-		super("SELECT i.target_id, i.inlink FROM inlinks i WHERE i.target_id IN (?)");
+	private ClusterLengthQueryOptimizer() {
+		super("SELECT id, len FROM cluster_lengths WHERE id IN (?)");
 		setMaxCachEntries(100000);
 	}
 
@@ -36,9 +35,9 @@ public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Inte
 	}
 
 	@Override
-	protected Integer getValueFromRs(ResultSet rs, Integer oldValue) {
+	protected Double getValueFromRs(ResultSet rs, Double oldValue) {
 		try {
-			return rs.getInt(2);
+			return rs.getDouble(2);
 		} catch (SQLException e) {
 			throw new RuntimeException(e);
 		}
@@ -55,7 +54,7 @@ public class InlinkQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Inte
 
 	@Override
 	public String getLoadAllQuery() {
-		return "SELECT i.target_id, i.inlink FROM inlinks i";
+		return "SELECT t.term, t.idf FROM terms t";
 	}
 
 }

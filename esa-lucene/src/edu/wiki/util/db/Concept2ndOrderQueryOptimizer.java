@@ -53,7 +53,7 @@ public class Concept2ndOrderQueryOptimizer extends AbstractDBQueryOptimizer<Inte
 	}
 
 	@Override
-	protected String getLoadAllQuery() {
+	public String getLoadAllQuery() {
 		return "SELECT id, vector FROM concept_2nd";
 	}
 

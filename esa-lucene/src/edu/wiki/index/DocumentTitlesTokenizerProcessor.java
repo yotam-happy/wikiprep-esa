@@ -9,9 +9,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
 
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
@@ -21,6 +19,7 @@ import edu.wiki.util.WikiprepESAdb;
 
 public class DocumentTitlesTokenizerProcessor {
 
+	static final int COUNT_THRESHHOLD = 5;
 	static final String tableName = "surface_names";
 	static final String[] tableColumns = {"name", "concept_id"};
 
@@ -28,7 +27,7 @@ public class DocumentTitlesTokenizerProcessor {
 
 	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
 
-		Map<String,Set<Integer>> allSurfaceNames = new HashMap<>();
+		Map<String,Map<Integer,Integer>> allSurfaceNames = new HashMap<>();
 		BulkDbInserter<Object[]> bulkDbInserter = new BulkDbInserter<Object[]>(tableName, tableColumns) {
 			@Override
 			protected void setRowData(PreparedStatement pstmt, Object[] data, int columnStartIndex) throws SQLException {
@@ -59,11 +58,11 @@ public class DocumentTitlesTokenizerProcessor {
 		while (rs.next()) {
 			String s = tokenizeString(new String(rs.getBytes(2), "UTF-8"), analyzer);
 			if (s != null && s.length() > 2){
-				Set<Integer> arr = allSurfaceNames.get(s);
+				Map<Integer, Integer> arr = allSurfaceNames.get(s);
 				if (arr == null){
-					arr = new HashSet<>();
+					arr = new HashMap<>();
 				}
-				arr.add(rs.getInt(1));
+				arr.put(rs.getInt(1), arr.get(rs.getInt(1)) != null ? arr.get(rs.getInt(1)) + 1 : 1);
 				allSurfaceNames.put(s, arr);
 			}
 			if (count % 100000 == 0) {
@@ -86,11 +85,11 @@ public class DocumentTitlesTokenizerProcessor {
 				if (s.length() > 250){
 					continue;
 				}
-				Set<Integer> arr = allSurfaceNames.get(s);
+				Map<Integer,Integer> arr = allSurfaceNames.get(s);
 				if (arr == null){
-					arr = new HashSet<>();
+					arr = new HashMap<>();
 				}
-				arr.add(rs2.getInt(1));
+				arr.put(rs2.getInt(1), arr.get(rs2.getInt(1)) != null ? arr.get(rs2.getInt(1)) + 1 : 1);
 				allSurfaceNames.put(s, arr);
 			}
 			if (count % 100000 == 0) {
@@ -115,7 +114,10 @@ public class DocumentTitlesTokenizerProcessor {
 		// Do the updating
 		c = 0;
 		allSurfaceNames.forEach((name, ids) -> {
-			ids.forEach(id->{
+			ids.forEach((id,form_count)->{
+				if (form_count < COUNT_THRESHHOLD) {
+					return;
+				}
 		    	try {
 		    		Object[] data = {name, new Integer(id)};
 		    		bulkDbInserter.addRow(data);

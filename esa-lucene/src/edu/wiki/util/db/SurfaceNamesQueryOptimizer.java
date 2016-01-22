@@ -53,7 +53,7 @@ public class SurfaceNamesQueryOptimizer extends AbstractDBQueryOptimizer<String,
 	}
 
 	@Override
-	protected String getLoadAllQuery() {
+	public String getLoadAllQuery() {
 		return "SELECT name, concept_id FROM surface_names";
 	}
 }

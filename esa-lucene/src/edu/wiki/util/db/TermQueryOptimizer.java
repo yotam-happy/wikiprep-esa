@@ -50,7 +50,7 @@ public class TermQueryOptimizer extends AbstractDBQueryOptimizer<String, byte[]>
 	}
 
 	@Override
-	protected String getLoadAllQuery() {
+	public String getLoadAllQuery() {
 		return "SELECT t.term, t.vector FROM idx t";
 	}
 }

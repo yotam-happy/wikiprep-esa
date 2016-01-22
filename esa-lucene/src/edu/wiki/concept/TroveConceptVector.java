@@ -15,6 +15,8 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 
 	private TIntDoubleHashMap valueMap;
 	private int size;
+	private int id;
+	private String desc;
 	
 	public TroveConceptVector(int size ) {
 		this.size = size;
@@ -76,6 +78,26 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 	@Override
 	public int size() {
 		return size;
+	}
+
+	@Override
+	public void setId(int id){
+		this.id = id;
+	}
+	
+	@Override
+	public int getId(){
+		return id;
+	}
+
+	@Override
+	public void setDesc(String desc){
+		this.desc = desc;
+	}
+	
+	@Override
+	public String getDesc(){
+		return desc;
 	}
 
 	private class TroveConceptVectorData implements IConceptVectorData {
@@ -155,5 +177,15 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 			valueIt = valueMap.iterator();
 		}
 		
+	}
+
+	@Override
+	public void multipty(Float c) {
+		// TODO Auto-generated method stub
+		TIntDoubleIterator iter = valueMap.iterator();
+		while(iter.hasNext()){
+			iter.advance();
+			iter.setValue(iter.value() / c);
+		}
 	}
 }

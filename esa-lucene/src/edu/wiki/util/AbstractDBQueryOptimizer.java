@@ -12,6 +12,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 /**
@@ -80,7 +81,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 * underlying data structure so it can be loaded into memory
 	 * @return
 	 */
-	protected abstract String getLoadAllQuery();
+	public abstract String getLoadAllQuery();
 	
 	public Stream<Entry<K, V>> cacheStream() {
 		return cache.entrySet().stream();
@@ -126,8 +127,10 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 			result.putAll(executePstmt());
 		}
 		
-		// Update cache
-		keys.forEach((k) -> addToCache(k, result.get(k)));
+		if (!getAllLoadedMode()) {
+			// Update cache
+			keys.forEach((k) -> addToCache(k, result.get(k)));
+		}
 
 		try {
 			pstmt.clearParameters();
@@ -260,11 +263,18 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	        rs.close();
 	        pstmtLoadAll.close();
 		}catch(SQLException e) {
-	        rs.close();
-	        pstmtLoadAll.close();
+	      //  rs.close();
+	      //  pstmtLoadAll.close();
 			throw new RuntimeException(e);
 		}
 		
+	}
+	
+	public void forEach(BiConsumer<K,V> consumer) {
+		if (!getAllLoadedMode()){
+			throw new RuntimeException("forEach only supported in allLoaded mode");
+		}
+		cache.forEach(consumer);
 	}
 	
 	private void setAllLoadedMode() {
