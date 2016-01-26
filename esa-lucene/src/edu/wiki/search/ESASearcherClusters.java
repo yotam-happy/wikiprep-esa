@@ -15,6 +15,7 @@ import edu.wiki.util.db.ClusterMembershipQueryOptimizer;
 import edu.wiki.util.db.ClusterSizeQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.InlinkQueryOptimizer;
+import edu.wiki.util.db.AbstractClusterMembershipQueryOptimizer.MembershipData;
 
 public class ESASearcherClusters {
 	ESASearcher searcher;
@@ -65,20 +66,20 @@ public class ESASearcherClusters {
 		
 		IConceptIterator it = vec.iterator();
 		while(it.next()){
-			Integer cluster = query.doQuery(it.getId()).cluster;
-			if (cluster != null) {
+			MembershipData clusterData = query.doQuery(it.getId());
+			if (clusterData != null) {
 				Double norm = 1.0;
 				switch(normalize){
 				case 1:
 					norm = ArticleLengthQueryOptimizer.getInstance().doQuery(it.getId()) /
-							ClusterLengthQueryOptimizer.getInstance().doQuery(cluster);
+							ClusterLengthQueryOptimizer.getInstance().doQuery(clusterData.cluster);
 					break;
 				case 2:
 					norm = ArticleLengthQueryOptimizer.getInstance().doQuery(it.getId()) *
-							((double)ClusterSizeQueryOptimizer.getInstance().doQuery(cluster) /
-							ClusterLengthQueryOptimizer.getInstance().doQuery(cluster));
+							((double)ClusterSizeQueryOptimizer.getInstance().doQuery(clusterData.cluster) /
+							ClusterLengthQueryOptimizer.getInstance().doQuery(clusterData.cluster));
 				}
-				vec2.add(cluster, it.getValue() * norm);
+				vec2.add(clusterData.cluster, it.getValue() * norm);
 			}
 		}
 		return vec2;

@@ -12,6 +12,6 @@ public class ClusterCentroidsQueryOptimizer extends AbstractClusterCentroidQuery
 	}
 
 	private ClusterCentroidsQueryOptimizer() {
-		super("cluster_membership");
+		super("cluster_centroids");
 	}
 }
