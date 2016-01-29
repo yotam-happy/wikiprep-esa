@@ -36,7 +36,7 @@ public class IndexPruner {
 	
 	static int PARALEL_TERM = 3;
 	
-	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
+	public static void initDB() throws SQLException {
 		connection = WikiprepESAdb.getInstance().getConnection();
 		
 		pstmtTerm = connection.createStatement();
@@ -60,13 +60,7 @@ public class IndexPruner {
 		
 	}
 	
-	/**
-	 * @param args
-	 * @throws IOException 
-	 * @throws SQLException 
-	 * @throws ClassNotFoundException 
-	 */
-	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws SQLException, IOException {
 	    
 	    initDB();
 	    

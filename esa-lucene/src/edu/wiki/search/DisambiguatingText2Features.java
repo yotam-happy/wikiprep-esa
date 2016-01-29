@@ -29,7 +29,7 @@ public class DisambiguatingText2Features {
 	SurfaceNamesQueryOptimizer articleQueryOptimizer;
 	ConceptESAVectorQueryOptimizer conceptESAVectorQueryOptimizer;
 	
-	public DisambiguatingText2Features() throws IOException, ClassNotFoundException {
+	public DisambiguatingText2Features() {
 		searcher = new ESASearcher();
 		articleQueryOptimizer = SurfaceNamesQueryOptimizer.getInstance();
 		conceptESAVectorQueryOptimizer = ConceptESAVectorQueryOptimizer.getInstance();
@@ -51,7 +51,7 @@ public class DisambiguatingText2Features {
 	}
 
 	static int k, kk, kkk;
-	public Map<Integer, Double> getDisambiguatingFeatures(Stream<String> contexts, int overlap) throws IOException {
+	public Map<Integer, Double> getDisambiguatingFeatures(Stream<String> contexts, int overlap) {
 		Map<Integer, Double> result = new HashMap<>();
 		c++;
 		k = 0;

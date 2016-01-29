@@ -3,7 +3,7 @@ package edu.wiki.index;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -39,7 +39,7 @@ public class DisambiguationHelperBuilder {
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
 	
-	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws SQLException, UnsupportedEncodingException {
 		String baseFileName = args[0];
 		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
 		Init(baseFileName);
@@ -92,6 +92,7 @@ public class DisambiguationHelperBuilder {
 							Map<Integer, Double > features = 
 									disambiguatingText2Features.getDisambiguatingFeatures(contexts.stream(),0);
 							if (features.isEmpty()) {
+								dos.close();
 								return;
 							}
 							
@@ -127,7 +128,7 @@ public class DisambiguationHelperBuilder {
 		System.out.println("total articles analyzed: " + c); 
 	}
 	
-	private static void Init(String baseFilename) throws SQLException, ClassNotFoundException, IOException {
+	private static void Init(String baseFilename) {
 //		System.out.println("loading Concept2ndOrderQueryOptimizer");
 //		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
 		System.out.println("loading TermQueryOptimizer");

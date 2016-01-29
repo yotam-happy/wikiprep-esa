@@ -29,11 +29,6 @@ import edu.wiki.index.WikipediaAnalyzer;
  */
 public class WikipediaNormalSearcher {
 
-	/**
-	 * @param args
-	 * @throws IOException 
-	 * @throws ParseException 
-	 */
 	public static void main(String[] args) throws IOException, ParseException {
 	    File indexDir = new File(args[0]);
 

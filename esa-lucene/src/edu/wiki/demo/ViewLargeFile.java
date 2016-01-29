@@ -6,7 +6,7 @@ import java.io.FileReader;
 import java.io.PrintWriter;
 
 public class ViewLargeFile {
-	public static void main(String[] args) throws FileNotFoundException {
+	public static void main(String[] args) {
 		StringBuffer sb = new StringBuffer();
 		int c = 0;
 		try (BufferedReader br = new BufferedReader(new FileReader(args[0]))) {
@@ -23,8 +23,12 @@ public class ViewLargeFile {
 			
 		}
 		
-		PrintWriter out = new PrintWriter(args[1]);
-		out.print(sb.toString());
-		out.close();
+		try {
+			PrintWriter out = new PrintWriter(args[1]);
+			out.print(sb.toString());
+			out.close();
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		}
 	}	
 }

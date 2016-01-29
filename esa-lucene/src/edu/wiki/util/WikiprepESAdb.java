@@ -1,7 +1,5 @@
 package edu.wiki.util;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -10,11 +8,7 @@ public class WikiprepESAdb {
 	static WikiprepESAdb wikiprepESAdb; 
 	Connection connection;
 
-	private WikiprepESAdb() throws ClassNotFoundException, SQLException, FileNotFoundException, IOException {
-		// Load the JDBC driver 
-		String driverName = "com.mysql.jdbc.Driver"; // MySQL Connector 
-		Class.forName(driverName); 
-		
+	private WikiprepESAdb() {
 		String serverName = WikiprepESAConfiguration.getInstance().getProperty(
 				WikiprepESAConfiguration.SERVER_NAME);
 		String mydatabase = WikiprepESAConfiguration.getInstance().getProperty(
@@ -26,16 +20,16 @@ public class WikiprepESAdb {
 
 		// Create a connection to the database 
 		String url = "jdbc:mysql://" + serverName + "/" + mydatabase; // a JDBC url 
-		connection = DriverManager.getConnection(url, username, password);
+		try {
+			connection = DriverManager.getConnection(url, username, password);
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
 	public static synchronized WikiprepESAdb getInstance() {
 		if (wikiprepESAdb == null) {
-			try {
-				wikiprepESAdb = new WikiprepESAdb();
-			} catch (ClassNotFoundException | SQLException | IOException e) {
-				throw new RuntimeException(e);
-			}
+			wikiprepESAdb = new WikiprepESAdb();
 		}
 		return wikiprepESAdb;
 	}

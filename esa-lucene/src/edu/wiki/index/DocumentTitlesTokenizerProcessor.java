@@ -1,7 +1,6 @@
 package edu.wiki.index;
 
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.sql.PreparedStatement;
@@ -25,23 +24,27 @@ public class DocumentTitlesTokenizerProcessor {
 
 	static int c = 0;
 
-	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws SQLException, UnsupportedEncodingException {
 
 		Map<String,Map<Integer,Integer>> allSurfaceNames = new HashMap<>();
 		BulkDbInserter<Object[]> bulkDbInserter = new BulkDbInserter<Object[]>(tableName, tableColumns) {
 			@Override
-			protected void setRowData(PreparedStatement pstmt, Object[] data, int columnStartIndex) throws SQLException {
-		    	if (data == null) {
-					pstmt.setNull(columnStartIndex, java.sql.Types.BLOB);
-					pstmt.setNull(columnStartIndex+1, java.sql.Types.INTEGER);
-		    	} else {
-					try {
-						pstmt.setBlob(columnStartIndex, new ByteArrayInputStream(((String)data[0]).getBytes("UTF-8")));
-					} catch (UnsupportedEncodingException e) {
-						throw new RuntimeException(e);
-					}
-					pstmt.setInt(columnStartIndex+1, (Integer)data[1]);
-		    	}
+			protected void setRowData(PreparedStatement pstmt, Object[] data, int columnStartIndex) {
+				try{
+			    	if (data == null) {
+						pstmt.setNull(columnStartIndex, java.sql.Types.BLOB);
+						pstmt.setNull(columnStartIndex+1, java.sql.Types.INTEGER);
+			    	} else {
+						try {
+							pstmt.setBlob(columnStartIndex, new ByteArrayInputStream(((String)data[0]).getBytes("UTF-8")));
+						} catch (UnsupportedEncodingException e) {
+							throw new RuntimeException(e);
+						}
+						pstmt.setInt(columnStartIndex+1, (Integer)data[1]);
+			    	}
+				}catch(SQLException e){
+					throw new RuntimeException(e);
+				}
 			}
 		};
 

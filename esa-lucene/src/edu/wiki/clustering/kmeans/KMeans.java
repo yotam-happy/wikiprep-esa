@@ -8,26 +8,42 @@ package edu.wiki.clustering.kmeans;
  * 2015
  *
 */
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Random;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-
 import edu.wiki.util.Tuple;
 import edu.wiki.util.counting.Counting;
+import gnu.trove.TIntHashSet;
+import gnu.trove.TIntIterator;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public class KMeans<T> {
 
+	private Map<Integer,TIntHashSet> mustLink = null;
+	private Map<Integer,TIntHashSet> cannotLink = null;
+	private Map<Integer,T> idMapping;
+    Function<T,Integer> getIdFunc = null;
+	
     private List<T> points;
     private List<Cluster<T>> clusters;
     
     private BiFunction<T, T, Double> metric;
     private Function<List<T>, T> centroidCalc;
     
+    
     private int maxIterations;
-    public KMeans(int numClusters, List<T> points, BiFunction<T, T, Double> metric, Function<List<T>, T> centroidCalc, int maxIterations) {
+    public KMeans(int numClusters, 
+    		List<T> points, 
+    		BiFunction<T, T, Double> metric, 
+    		Function<List<T>, T> centroidCalc, 
+    		int maxIterations) {
     	this.maxIterations = maxIterations;
     	this.points = points;
     	this.clusters = new ArrayList<Cluster<T>>();    	
@@ -42,6 +58,49 @@ public class KMeans<T> {
     		cluster.setCentroid(centroid);
     		clusters.add(cluster);
     	}
+    }
+    
+    
+    public void addMustLinkConstrain(int id1, int id2) {
+    	if (!mustLink.containsKey(id1)){
+    		mustLink.put(id1, new TIntHashSet());
+    	}
+    	if (mustLink.containsKey(id2)){
+    		mustLink.put(id1, new TIntHashSet());
+    	}
+    	mustLink.get(id1).forEach((i)->mustLink.get(i).add(id2));
+    	mustLink.get(id2).forEach((i)->mustLink.get(i).add(id1));
+    	mustLink.get(id1).add(id2);
+    	mustLink.get(id2).add(id1);
+    }
+    public void addCannotLinkConstrain(int id1, int id2) {
+    	if (!cannotLink.containsKey(id1)){
+    		cannotLink.put(id1, new TIntHashSet());
+    	}
+    	if (!cannotLink.containsKey(id2)){
+    		cannotLink.put(id2, new TIntHashSet());
+    	}
+    	if (mustLink.containsKey(id1)) {
+    		mustLink.get(id1).forEach((i)->cannotLink.get(i).add(id2));
+    	}
+    	if (mustLink.containsKey(id2)) {
+    		mustLink.get(id2).forEach((i)->cannotLink.get(i).add(id1));
+    	}
+    	cannotLink.get(id1).add(id2);
+    	cannotLink.get(id2).add(id1);
+    }
+    
+    public void setConstraints(Set<Tuple<Integer,Integer>> mustLink, 
+    		Set<Tuple<Integer,Integer>> cannotLink, 
+    		Function<T,Integer> getId){
+    	idMapping = new HashMap<>();
+    	points.forEach((p)->idMapping.put(getId.apply(p), p));
+    	
+    	this.mustLink = new HashMap<>();
+    	this.cannotLink = new HashMap<>();
+    	this.getIdFunc = getId;
+    	mustLink.forEach((t)->addMustLinkConstrain(t.x, t.y));
+    	cannotLink.forEach((t)->addCannotLinkConstrain(t.x, t.y));
     }
     
     public List<Cluster<T>> getClusters() {
@@ -106,10 +165,43 @@ public class KMeans<T> {
     	}
     }
     
+    private boolean isConstraintViolated(int pointId, Cluster<T> cluster) {
+    	// must link
+    	if (mustLink.containsKey(pointId)){
+    		TIntIterator it = mustLink.get(pointId).iterator();
+    		while(it.hasNext()){
+    			if (!cluster.getPoints().contains(it.next())){
+    				return false;
+    			}
+    		}
+    	}
+    	// cannot link
+    	if (cannotLink.containsKey(pointId)){
+    		TIntIterator it = cannotLink.get(pointId).iterator();
+    		while(it.hasNext()){
+    			if (cluster.getPoints().contains(it.next())){
+    				return false;
+    			}
+    		}
+    	}
+    	return true;
+    }
+    
     public Tuple<Integer,Double> getBestCluster(T point){
-    	return clusters.stream()
-	    	.map((cluster)->new Tuple<Integer,Double>(cluster.id,metric.apply(point, cluster.getCentroid())))
-	    	.min((e1,e2)->Double.compare(e1.y, e2.y)).orElse(null);
+    	List<Tuple<Integer,Double>> l = clusters.stream()
+			.map((cluster)->new Tuple<Integer,Double>(cluster.id,metric.apply(point, cluster.getCentroid())))
+	    	.sorted((e1,e2)->Double.compare(e1.y, e2.y)).collect(Collectors.toList());
+    	
+    	if (getIdFunc == null){
+    		return l.get(0);
+    	} else {
+    		for(Tuple<Integer,Double> t : l){
+    			if (!isConstraintViolated(getIdFunc.apply(point), clusters.get(t.x))){
+    				return t;
+    			}
+    		}
+    	}
+    	throw new RuntimeException("Could not finish clustering due to constraint problems");
     }
     
     private void assignCluster(boolean partial) {

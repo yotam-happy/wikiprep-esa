@@ -49,7 +49,7 @@ public class ESAAnalyzeSelf {
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
 	
-	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws IOException, SQLException {
 		String baseFileName = args[0];
 		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
 		Init(baseFileName);
@@ -141,7 +141,7 @@ public class ESAAnalyzeSelf {
 		
 	}
 	
-	private static void Init(String baseFilename) throws SQLException, ClassNotFoundException, IOException {
+	private static void Init(String baseFilename) {
 		System.out.println("in-memory cache tables...");
 		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
 		TermQueryOptimizer.getInstance().loadAll();

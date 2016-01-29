@@ -1,7 +1,6 @@
 package edu.wiki.util;
 
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Properties;
 
@@ -20,12 +19,16 @@ public class WikiprepESAConfiguration {
 	static WikiprepESAConfiguration wikiprepESAConfiguration; 
 	Properties configuration;
 	
-	private WikiprepESAConfiguration() throws FileNotFoundException, IOException {
+	private WikiprepESAConfiguration() {
 		configuration = new Properties();
-		configuration.load(new FileInputStream("wikiprep-esa.config"));
+		try {
+			configuration.load(new FileInputStream("wikiprep-esa.config"));
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
-	public static synchronized WikiprepESAConfiguration getInstance() throws FileNotFoundException, IOException {
+	public static synchronized WikiprepESAConfiguration getInstance() {
 		if (wikiprepESAConfiguration == null) {
 			wikiprepESAConfiguration = new WikiprepESAConfiguration();
 		}

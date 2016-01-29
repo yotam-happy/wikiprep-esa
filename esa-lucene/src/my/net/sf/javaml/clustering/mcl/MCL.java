@@ -96,14 +96,6 @@ public class MCL implements Clusterer {
         
         // convert matrix to output dataset:
         int[] sparseMatrixSize = matrix.getSize();
-        // find number of attractors (non zero values) in diagonal
-        int attractors = 0;
-        for (int i = 0; i < sparseMatrixSize[0]; i++) {
-            double val = matrix.get(i, i);
-            if (val != 0) {
-                attractors++;
-            }
-        }
         // create cluster for each attractor with value close to 1
         Vector<Vector<Instance>> finalClusters = new Vector<Vector<Instance>>();
 

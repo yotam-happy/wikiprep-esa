@@ -15,7 +15,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -68,7 +67,7 @@ public class IndexModifier {
 	
 	static DecimalFormat df = new DecimalFormat("#.########");
 		
-	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
+	public static void initDB() throws SQLException {
 		connection = WikiprepESAdb.getInstance().getConnection();
 		
 		stmtLink = connection.createStatement();
@@ -108,14 +107,7 @@ public class IndexModifier {
 		
 	}
 	
-	/**
-	 * @param args
-	 * @throws IOException 
-	 * @throws SQLException 
-	 * @throws ClassNotFoundException 
-	 * @throws NoSuchAlgorithmException 
-	 */
-	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws SQLException, IOException {
 			    		
 		try {
 	    	Directory fsdir = FSDirectory.open(new File(args[0]));

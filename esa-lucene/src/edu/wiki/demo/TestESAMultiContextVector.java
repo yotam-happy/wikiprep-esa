@@ -1,15 +1,10 @@
 package edu.wiki.demo;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.sql.SQLException;
-
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESAMultiResolutionSearcher;
 
 public class TestESAMultiContextVector extends AbstractTestClass{
-	public static void main(String[] args) throws ClassNotFoundException, SQLException, IOException {
+	public static void main(String[] args) {
 		TestESAMultiContextVector test = new TestESAMultiContextVector();
 		test.doMain(args);
 	}
@@ -18,7 +13,7 @@ public class TestESAMultiContextVector extends AbstractTestClass{
 	public IConceptVector getVector() {
 		try {
 			ESAMultiResolutionSearcher searcher = new ESAMultiResolutionSearcher();
-			BufferedReader in = new BufferedReader(new InputStreamReader(System.in,"UTF-8"));
+			//BufferedReader in = new BufferedReader(new InputStreamReader(System.in,"UTF-8"));
 			String text = "Artificial intelligence (AI) is the intelligence exhibited by machines or software. It is also"
 					+ " the name of the academic field of study which studies how to create computers and computer" 
 					+ " software that are capable of intelligent behavior. Major AI researchers and textbooks define"

@@ -32,7 +32,7 @@ public class ESA2ndOrderVectorCalculator {
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorQuery = "INSERT INTO concept_2nd (id,vector) VALUES (?,?)";
 
-	public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	public static void main(String[] args) throws SQLException, IOException {
 
 		WikiprepESAdb.getInstance().getConnection().setAutoCommit(false);
 		PreparedStatement pstmt = WikiprepESAdb.getInstance().getConnection().prepareStatement(strVectorQuery);

@@ -17,18 +17,26 @@ public class TermVectorIterator {
     private int currConceptId;
     private float currConceptScore;
     
-    public TermVectorIterator(byte[] vector) throws IOException {
+    public TermVectorIterator(byte[] vector) {
     	bais = new ByteArrayInputStream(vector);
     	dis = new DataInputStream(bais);
-    	vectorLen = dis.readInt();
+    	try {
+			vectorLen = dis.readInt();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
 	}
     
-    public boolean next() throws IOException {
+    public boolean next() {
     	if (next >= vectorLen) {
     		return false;
     	}
-    	currConceptId = dis.readInt();
-    	currConceptScore = dis.readFloat();
+    	try {
+			currConceptId = dis.readInt();
+	    	currConceptScore = dis.readFloat();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
     	next++;
     	return true;
     }

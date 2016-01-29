@@ -11,22 +11,14 @@ public abstract class BulkDbInserter<T> {
 
 	public BulkDbInserter(String tableName, String[] columns) {
 		nColumns = columns.length;
-		try {
-			pstmt = buildStatement(tableName, columns, MAX_ROWS_PER_STATEMENT);
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
-		}
+		pstmt = buildStatement(tableName, columns, MAX_ROWS_PER_STATEMENT);
 		curRow = 0;
 	}
 	
-	protected abstract void setRowData(PreparedStatement pstmt, T data, int columnStartIndex) throws SQLException;
+	protected abstract void setRowData(PreparedStatement pstmt, T data, int columnStartIndex);
 	
 	public void addRow(T data) {
-		try {
-			setRowData(pstmt, data, curRow * nColumns + 1);
-		} catch (SQLException e1) {
-			throw new RuntimeException(e1);
-		}
+		setRowData(pstmt, data, curRow * nColumns + 1);
 		curRow++;
 		if (curRow == MAX_ROWS_PER_STATEMENT) {
 			try {
@@ -42,11 +34,7 @@ public abstract class BulkDbInserter<T> {
 			return;
 		}
 		for (int i = curRow; i < MAX_ROWS_PER_STATEMENT; i++){
-			try {
-				setRowData(pstmt, null, i * nColumns + 1);
-			} catch (SQLException e) {
-				throw new RuntimeException(e);
-			}
+			setRowData(pstmt, null, i * nColumns + 1);
 		}
 		try {
 			pstmt.execute();
@@ -56,7 +44,7 @@ public abstract class BulkDbInserter<T> {
 		}
 	}
 	
-	private PreparedStatement buildStatement(String tableName, String[] columns, int rows) throws SQLException {
+	private PreparedStatement buildStatement(String tableName, String[] columns, int rows) {
 		StringBuffer sb = new StringBuffer();
 		sb.append("INSERT IGNORE ").append(tableName).append(" (");
 		boolean first = true;
@@ -76,6 +64,10 @@ public abstract class BulkDbInserter<T> {
 			sb.append(")");
 			first = false;
 		}
-		return WikiprepESAdb.getInstance().getConnection().prepareStatement(sb.toString());
+		try {
+			return WikiprepESAdb.getInstance().getConnection().prepareStatement(sb.toString());
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 }

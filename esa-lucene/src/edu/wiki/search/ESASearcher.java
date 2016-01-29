@@ -2,7 +2,6 @@ package edu.wiki.search;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -56,23 +55,16 @@ public class ESASearcher {
 		termList.clear();
 	}
 	
-	public ESASearcher() throws ClassNotFoundException, IOException{
+	public ESASearcher() {
 		analyzer = new WikipediaAnalyzer();
-	}
-	
-	@Override
-	protected void finalize() throws Throwable {
-		super.finalize();
 	}
 	
 	/**
 	 * Retrieves full vector for regular features
 	 * @param query
 	 * @return Returns concept vector results exist, otherwise null 
-	 * @throws IOException
-	 * @throws SQLException
 	 */
-	public IConceptVector getConceptVector(String query) throws IOException{
+	public IConceptVector getConceptVector(String query) {
 		double vdouble;
 		double tf;
 		double vsum;
@@ -81,24 +73,28 @@ public class ESASearcher {
 		String strTerm;
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
         this.clean();
-        ts.reset();
-        while (ts.incrementToken()) { 
-            TermAttribute t = ts.getAttribute(TermAttribute.class);
-            strTerm = t.term();
-            // records term counts for TF
-            if(freqMap.containsKey(strTerm)){
-            	vint = freqMap.get(strTerm);
-            	freqMap.put(strTerm, vint+1);
-            }
-            else {
-            	freqMap.put(strTerm, 1);
-            }
-            termList.add(strTerm);
-            numTerms++;	
-        }
-                
-        ts.end();
-        ts.close();
+        try {
+			ts.reset();
+	        while (ts.incrementToken()) { 
+	            TermAttribute t = ts.getAttribute(TermAttribute.class);
+	            strTerm = t.term();
+	            // records term counts for TF
+	            if(freqMap.containsKey(strTerm)){
+	            	vint = freqMap.get(strTerm);
+	            	freqMap.put(strTerm, vint+1);
+	            }
+	            else {
+	            	freqMap.put(strTerm, 1);
+	            }
+	            termList.add(strTerm);
+	            numTerms++;	
+	        }
+	                
+	        ts.end();
+	        ts.close();
+		} catch (IOException e1) {
+			throw new RuntimeException(e1);
+		}
         
         if(numTerms == 0){
         	return null;
@@ -161,7 +157,7 @@ public class ESASearcher {
 	}
 
 	static boolean first;
-	public IConceptVector getConceptVector2(String query, double fac) throws IOException{
+	public IConceptVector getConceptVector2(String query, double fac) {
 		double vdouble;
 		double tf;
 		double vsum;
@@ -170,24 +166,28 @@ public class ESASearcher {
 		String strTerm;
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
         this.clean();
-        ts.reset();
-        while (ts.incrementToken()) { 
-            TermAttribute t = ts.getAttribute(TermAttribute.class);
-            strTerm = t.term();
-            // records term counts for TF
-            if(freqMap.containsKey(strTerm)){
-            	vint = freqMap.get(strTerm);
-            	freqMap.put(strTerm, vint+1);
-            }
-            else {
-            	freqMap.put(strTerm, 1);
-            }
-            termList.add(strTerm);
-            numTerms++;	
-        }
-                
-        ts.end();
-        ts.close();
+        try {
+			ts.reset();
+	        while (ts.incrementToken()) { 
+	            TermAttribute t = ts.getAttribute(TermAttribute.class);
+	            strTerm = t.term();
+	            // records term counts for TF
+	            if(freqMap.containsKey(strTerm)){
+	            	vint = freqMap.get(strTerm);
+	            	freqMap.put(strTerm, vint+1);
+	            }
+	            else {
+	            	freqMap.put(strTerm, 1);
+	            }
+	            termList.add(strTerm);
+	            numTerms++;	
+	        }
+	                
+	        ts.end();
+	        ts.close();
+		} catch (IOException e1) {
+			throw new RuntimeException(e1);
+		}
         
         if(numTerms == 0){
         	return null;
@@ -256,7 +256,7 @@ public class ESASearcher {
 		return newCv;
 	}
 	
-	public IConceptVector getNormalVector(String query, int maxVectorLen) throws IOException {
+	public IConceptVector getNormalVector(String query, int maxVectorLen) {
 		IConceptVector cvBase = getConceptVector(query);
 		
 		if(cvBase == null){
@@ -320,15 +320,11 @@ public class ESASearcher {
 			if (!concept2nd.containsKey(conceptId)) {
 				continue;
 			}
-			try {
-				TermVectorIterator tvi = new TermVectorIterator(concept2nd.get(conceptId));
-				while(tvi.next()) {
-					int targetId = tvi.getConceptId();
-					bonus.put(targetId, 
-							tvi.getConceptScore() * conceptScore + bonus.get(targetId));
-				}
-			} catch(IOException e) {
-				throw new RuntimeException(e);
+			TermVectorIterator tvi = new TermVectorIterator(concept2nd.get(conceptId));
+			while(tvi.next()) {
+				int targetId = tvi.getConceptId();
+				bonus.put(targetId, 
+						tvi.getConceptScore() * conceptScore + bonus.get(targetId));
 			}
 		}
 
@@ -360,12 +356,12 @@ public class ESASearcher {
 	 * @param secondOrderLimit	When doing 2nd order vector, max number of top
 	 * 							bonus scoring elements to update
 	 */
-	public IConceptVector getCombinedVector(String query, int maxVectorLen) throws IOException {
+	public IConceptVector getCombinedVector(String query, int maxVectorLen) {
 		IConceptVector cvBase = getConceptVector(query);
 		return getCombinedVector(cvBase, maxVectorLen);
 	}
 
-	public IConceptVector getCombinedVector(IConceptVector cvBase, int maxVectorLen) throws IOException {
+	public IConceptVector getCombinedVector(IConceptVector cvBase, int maxVectorLen) {
 		IConceptVector cvNormal, cvLink;
 		
 		if(cvBase == null){
@@ -379,7 +375,7 @@ public class ESASearcher {
 		return cvNormal;
 	}
 	
-	public IConceptVector getConceptESAVector(byte[] vec) throws IOException {
+	public IConceptVector getConceptESAVector(byte[] vec) {
 		TermVectorIterator tvi = new TermVectorIterator(vec);
 		IConceptVector result = new TroveConceptVector(tvi.getVectorLen());
 		while(tvi.next()) {
@@ -389,7 +385,7 @@ public class ESASearcher {
 		return result;
 	}
 	
-	public IConceptVector getConceptESAVector(int conceptId) throws IOException {
+	public IConceptVector getConceptESAVector(int conceptId) {
 		Map<Integer,byte[]> map = ConceptESAVectorQueryOptimizer.getInstance()
 				.doQuery(new HashSet<Integer>(Arrays.asList(conceptId)));
 

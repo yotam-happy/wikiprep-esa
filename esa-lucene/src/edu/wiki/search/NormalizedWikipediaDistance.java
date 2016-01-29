@@ -52,10 +52,14 @@ public class NormalizedWikipediaDistance {
 		
     }
 	
-	private int freqSearch(String phrase) throws ParseException, IOException{
-    	wQuery = qparser.parse("\""+QueryParser.escape(phrase)+"\"");
-    	// wQuery = qparser.parse(QueryParser.escape(phrase));
-        wResults = searcher.search(wQuery,1);
+	private int freqSearch(String phrase) {
+    	try {
+			wQuery = qparser.parse("\""+QueryParser.escape(phrase)+"\"");
+	    	// wQuery = qparser.parse(QueryParser.escape(phrase));
+	        wResults = searcher.search(wQuery,1);
+		} catch (ParseException | IOException e) {
+			throw new RuntimeException(e);
+		}
         return wResults.totalHits;
     }
 	
@@ -64,13 +68,15 @@ public class NormalizedWikipediaDistance {
      * @param queryString
      * @param exactPhrase
      * @return
-     * @throws ParseException
-     * @throws IOException
      */
-    private int occurSearch(String phrase1, String phrase2) throws ParseException, IOException{
-    	wQuery = qparser.parse("\""+QueryParser.escape(phrase1)+"\" AND " + "\""+QueryParser.escape(phrase2)+"\"");
-    	// wQuery = qparser.parse("(" + QueryParser.escape(phrase1)+") AND (" + QueryParser.escape(phrase2) + ")");
-        wResults = searcher.search(wQuery,1);
+    private int occurSearch(String phrase1, String phrase2) {
+    	try {
+			wQuery = qparser.parse("\""+QueryParser.escape(phrase1)+"\" AND " + "\""+QueryParser.escape(phrase2)+"\"");
+	    	// wQuery = qparser.parse("(" + QueryParser.escape(phrase1)+") AND (" + QueryParser.escape(phrase2) + ")");
+	        wResults = searcher.search(wQuery,1);
+		} catch (ParseException | IOException e) {
+			throw new RuntimeException(e);
+		}
         return wResults.totalHits;
     }
 	
@@ -80,19 +86,12 @@ public class NormalizedWikipediaDistance {
     	
     	nres.reset();
     	
-    	try {
-			nres.res1 = freqSearch(label1);
-			f1 = nres.res1;
-			nres.res2 = freqSearch(label2);
-			f2 = nres.res2;
-			nres.resCommon = occurSearch(label1, label2);
-			fCommon = nres.resCommon;
-			
-		} catch (ParseException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+		nres.res1 = freqSearch(label1);
+		f1 = nres.res1;
+		nres.res2 = freqSearch(label2);
+		f2 = nres.res2;
+		nres.resCommon = occurSearch(label1, label2);
+		fCommon = nres.resCommon;
 		
 		if(f1 == 0 || f2 == 0){
 			return -1f;	// undefined

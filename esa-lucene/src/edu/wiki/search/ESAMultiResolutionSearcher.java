@@ -1,6 +1,5 @@
 package edu.wiki.search;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
 
@@ -25,7 +24,7 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 	public static final int CONCEPTS_PER_MED_CONTEXT = 10;
 	public static final int CONCEPTS_PER_LONG_CONTEXT = 25;
 	
-	public ESAMultiResolutionSearcher() throws ClassNotFoundException, IOException {
+	public ESAMultiResolutionSearcher() {
 		super();
 	}
 
@@ -90,12 +89,9 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 			boolean use2ndOrder, 
 			int maxConcepts,
 			TIntDoubleHashMap result) {
-		IConceptVector v;
-		try {
-			v = use2ndOrder ? getCombinedVector(context, maxConcepts) : getNormalVector(context, maxConcepts);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		}
+		IConceptVector v = use2ndOrder ? 
+				getCombinedVector(context, maxConcepts) : 
+				getNormalVector(context, maxConcepts);
 		
 		if (v == null || v.count() == 0) {
 			return;

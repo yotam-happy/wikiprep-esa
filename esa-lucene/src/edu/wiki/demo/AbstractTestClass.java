@@ -1,6 +1,6 @@
 package edu.wiki.demo;
 
-import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -18,21 +18,19 @@ public abstract class AbstractTestClass {
 	static String strTitles = "SELECT id,title FROM article WHERE id IN ";
 	static final int MAX_CONCEPTS = 20;
 	
-	public static void initDB() throws ClassNotFoundException, SQLException, IOException {
+	public static void initDB() {
 		connection = WikiprepESAdb.getInstance().getConnection();
-		stmtQuery = connection.createStatement();
-		stmtQuery.setFetchSize(100);
+		try {
+			stmtQuery = connection.createStatement();
+			stmtQuery.setFetchSize(100);
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
   }
 
 	public abstract IConceptVector getVector();
 
-	/**
-	 * @param args
-	 * @throws IOException 
-	 * @throws SQLException 
-	 * @throws ClassNotFoundException 
-	 */
-	public void doMain(String[] args) throws ClassNotFoundException, SQLException, IOException {
+	public void doMain(String[] args) {
 		initDB();
 
 		IConceptVector cv = getVector();
@@ -56,10 +54,14 @@ public abstract class AbstractTestClass {
 		}
 		
 		inPart = inPart.substring(0,inPart.length()-1) + ")";
-				
-		ResultSet r = stmtQuery.executeQuery(strTitles + inPart);
-		while(r.next()){
-			titles.put(r.getInt(1), new String(r.getBytes(2),"UTF-8")); 
+
+		try{
+			ResultSet r = stmtQuery.executeQuery(strTitles + inPart);
+			while(r.next()){
+				titles.put(r.getInt(1), new String(r.getBytes(2),"UTF-8")); 
+			}
+		}catch(SQLException | UnsupportedEncodingException e){
+			throw new RuntimeException(e);
 		}
 		
 		count = 0;

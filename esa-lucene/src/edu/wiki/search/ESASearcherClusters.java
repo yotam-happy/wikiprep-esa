@@ -1,13 +1,12 @@
 package edu.wiki.search;
 
-import java.io.IOException;
-import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.concept.TroveConceptVector;
+import edu.wiki.util.db.AbstractClusterMembershipQueryOptimizer.MembershipData;
 import edu.wiki.util.db.ArticleLengthQueryOptimizer;
 import edu.wiki.util.db.ClusterCentroidsQueryOptimizer;
 import edu.wiki.util.db.ClusterLengthQueryOptimizer;
@@ -15,7 +14,6 @@ import edu.wiki.util.db.ClusterMembershipQueryOptimizer;
 import edu.wiki.util.db.ClusterSizeQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.InlinkQueryOptimizer;
-import edu.wiki.util.db.AbstractClusterMembershipQueryOptimizer.MembershipData;
 
 public class ESASearcherClusters {
 	ESASearcher searcher;
@@ -24,12 +22,8 @@ public class ESASearcherClusters {
 	
 	public ESASearcherClusters() {
 		ClusterCentroidsQueryOptimizer query = ClusterCentroidsQueryOptimizer.getInstance();
-		try {
-			searcher = new ESASearcher();
-			query.loadAll();
-		} catch (ClassNotFoundException | IOException | SQLException e1) {
-			throw new RuntimeException(e1);
-		}
+		searcher = new ESASearcher();
+		query.loadAll();
 		centroids = new HashMap<>();
 
 		query.forEach((id, centroidVec) -> {
@@ -95,7 +89,7 @@ public class ESASearcherClusters {
 	}
 		
 	
-	public IConceptVector filterUsingSelfVectors(IConceptVector vec) throws IOException {
+	public IConceptVector filterUsingSelfVectors(IConceptVector vec) {
 		IConceptVector v2 = new TroveConceptVector(100);
 		IConceptIterator it = vec.iterator();
 		while(it.next()){
@@ -107,7 +101,7 @@ public class ESASearcherClusters {
 		
 		return v2;
 	}
-	public IConceptVector filterTopConcepts(IConceptVector vec, int treshold) throws IOException {
+	public IConceptVector filterTopConcepts(IConceptVector vec, int treshold) {
 		IConceptVector v2 = new TroveConceptVector(100);
 		IConceptIterator it = vec.iterator();
 		while(it.next()){

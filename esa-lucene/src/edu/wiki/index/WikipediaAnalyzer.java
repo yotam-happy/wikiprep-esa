@@ -28,33 +28,36 @@ public class WikipediaAnalyzer extends Analyzer {
 	  for searching.*/
 	public final Set<?> ENGLISH_STOP_WORDS_SET;
 	
-	public WikipediaAnalyzer() throws IOException {
-		// read stop words
-		FileInputStream fis = new FileInputStream(new File("config/stopwords.txt"));
-		BufferedReader br = new BufferedReader(new InputStreamReader(fis));
-		ArrayList<String> stopWords = new ArrayList<String>(500);
-		
-		String line;
-		
-		while((line = br.readLine()) != null){
-			line = line.trim();
-			if(!line.equals("")){
-				stopWords.add(line.trim());
+	public WikipediaAnalyzer() {
+		try{
+			// read stop words
+			FileInputStream fis = new FileInputStream(new File("config/stopwords.txt"));
+			BufferedReader br = new BufferedReader(new InputStreamReader(fis));
+			ArrayList<String> stopWords = new ArrayList<String>(500);
+			
+			String line;
+			
+			while((line = br.readLine()) != null){
+				line = line.trim();
+				if(!line.equals("")){
+					stopWords.add(line.trim());
+				}
 			}
+			
+			br.close();
+			
+			final CharArraySet stopSet = new CharArraySet(stopWords.size(), false);
+			stopSet.addAll(stopWords);  
+					
+			ENGLISH_STOP_WORDS_SET = CharArraySet.unmodifiableSet(stopSet);
+		}catch(IOException e){
+			throw new RuntimeException(e);
 		}
-		
-		br.close();
-		
-		final CharArraySet stopSet = new CharArraySet(stopWords.size(), false);
-		stopSet.addAll(stopWords);  
-				
-		ENGLISH_STOP_WORDS_SET = CharArraySet.unmodifiableSet(stopSet);
-
 	}
 
 	
     public TokenStream reusableTokenStream(
-        String fieldName, Reader reader) throws IOException {
+        String fieldName, Reader reader) {
 
         SavedStreams streams =
             (SavedStreams) getPreviousTokenStream();
@@ -76,7 +79,11 @@ public class WikipediaAnalyzer extends Analyzer {
             streams.stream = new PorterStemFilter(streams.stream);
             streams.stream = new PorterStemFilter(streams.stream);
         } else {
-            streams.tokenizer.reset(reader);
+            try {
+				streams.tokenizer.reset(reader);
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
         }
 
         return streams.stream;

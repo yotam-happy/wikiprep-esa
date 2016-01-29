@@ -1,14 +1,11 @@
 package edu.wiki.demo;
 
-import java.io.IOException;
-import java.sql.SQLException;
-
 import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESASearcher;
 import edu.wiki.util.WikiprepESAdb;
 
 public class TestConceptESAVectors  extends AbstractTestClass{
-	public static void main(String[] args) throws ClassNotFoundException, SQLException, IOException {
+	public static void main(String[] args) {
 		TestCombinedESAVectors test = new TestCombinedESAVectors();
 		test.doMain(args);
 	}

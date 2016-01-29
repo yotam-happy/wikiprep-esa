@@ -2,8 +2,6 @@ package edu.wiki.util;
 
 import gnu.trove.THashMap;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -41,10 +39,6 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	 * 							"SELECT [key and value columns] FROM [table] WHERE [id] IN (?)"
 	 * 							The important part is IN(?). This will be filled by
 	 * 							list of ids
-	 * @throws IOException 
-	 * @throws SQLException 
-	 * @throws FileNotFoundException 
-	 * @throws ClassNotFoundException 
 	 */
 	public AbstractDBQueryOptimizer(String query) {
 		cache = new THashMap<K,V>();
@@ -241,16 +235,20 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	/**
 	 * This method sets cache to unlimited size and
 	 * fills it with the entire table
-	 * @throws SQLException 
 	 */
-	public void loadAll() throws SQLException {
+	public void loadAll() {
 		if (getLoadAllQuery() == null) {
 			return;
 		}
 		setAllLoadedMode();
 		cache.clear();
-		PreparedStatement pstmtLoadAll = WikiprepESAdb.getInstance().getConnection()
-				.prepareStatement(getLoadAllQuery());
+		PreparedStatement pstmtLoadAll;
+		try {
+			pstmtLoadAll = WikiprepESAdb.getInstance().getConnection()
+					.prepareStatement(getLoadAllQuery());
+		} catch (SQLException e1) {
+			throw new RuntimeException(e1);
+		}
 		ResultSet rs = null;
 		try {
 	        pstmtLoadAll.execute();

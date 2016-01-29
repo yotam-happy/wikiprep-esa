@@ -42,7 +42,7 @@ public class ESAWikipediaIndexer {
 	  static int limitID; 
 	  int addCount = 0;
 	  
-	  public static void initDB() throws ClassNotFoundException, SQLException, IOException {
+	  public static void initDB() throws SQLException {
 			connection = WikiprepESAdb.getInstance().getConnection();
 			
 			pstmt = connection.prepareStatement(strArticleQuery);
@@ -56,7 +56,7 @@ public class ESAWikipediaIndexer {
 			stmtLimit.close();
 		}
 	  
-	  public static void main(String[] args) throws IOException, ClassNotFoundException, SQLException {
+	  public static void main(String[] args) throws SQLException, IOException {
 		
 	    if(args.length < 1){
 	    	System.out.println("Usage: ESAWikipediaIndexer <index path>");
@@ -102,7 +102,7 @@ public class ESAWikipediaIndexer {
 	   * Indexes a file or directory
 	   * @param fileName the name of a text file or a folder we wish to add to the index
 	   * @throws java.io.IOException
-	 * @throws SQLException 
+	   * @throws SQLException 
 	   */
 	  public void indexDB() throws IOException, SQLException {
 	    
