@@ -1,16 +1,21 @@
 package edu.wiki.util.db;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class ClusterMembershipQueryOptimizer extends AbstractClusterMembershipQueryOptimizer {
-	private static ClusterMembershipQueryOptimizer instance;
+	private static Map<String,ClusterMembershipQueryOptimizer> instances = new HashMap<>();
 	
-	public static ClusterMembershipQueryOptimizer getInstance() {
-		if (instance == null) {
-			instance = new ClusterMembershipQueryOptimizer();
+	public static ClusterMembershipQueryOptimizer getInstance(String baseTableNme) {
+		ClusterMembershipQueryOptimizer o = instances.get(baseTableNme);
+		if (o == null) {
+			o = new ClusterMembershipQueryOptimizer(baseTableNme);
+			instances.put(baseTableNme, o);
 		}
-		return instance;
+		return o;
 	}
 
-	private ClusterMembershipQueryOptimizer(){
-		super("cluster_membership");
+	private ClusterMembershipQueryOptimizer(String baseTableNme){
+		super(baseTableNme + "_membership");
 	}
 }

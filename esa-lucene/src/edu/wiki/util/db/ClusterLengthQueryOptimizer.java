@@ -3,21 +3,27 @@ package edu.wiki.util.db;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashMap;
+import java.util.Map;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
 public class ClusterLengthQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Double>{
-	private static ClusterLengthQueryOptimizer instance;
+	private static Map<String,ClusterLengthQueryOptimizer> instances = new HashMap<>();
 	
-	public static ClusterLengthQueryOptimizer getInstance() {
-		if (instance == null) {
-			instance = new ClusterLengthQueryOptimizer();
+	public static ClusterLengthQueryOptimizer getInstance(String baseTableNme) {
+		ClusterLengthQueryOptimizer o = instances.get(baseTableNme);
+		if (o == null) {
+			o = new ClusterLengthQueryOptimizer(baseTableNme);
+			instances.put(baseTableNme, o);
 		}
-		return instance;
+		return o;
 	}
 
-	private ClusterLengthQueryOptimizer() {
-		super("SELECT id, len FROM cluster_lengths WHERE id IN (?)");
+	String baseTableNme;
+	private ClusterLengthQueryOptimizer(String baseTableNme) {
+		super("SELECT id, len FROM " + baseTableNme + "_lengths WHERE id IN (?)");
+		this.baseTableNme = baseTableNme;
 		setMaxCachEntries(100000);
 	}
 
@@ -54,7 +60,7 @@ public class ClusterLengthQueryOptimizer extends AbstractDBQueryOptimizer<Intege
 
 	@Override
 	public String getLoadAllQuery() {
-		return "SELECT t.term, t.idf FROM terms t";
+		return "SELECT id, len FROM " + baseTableNme + "_lengths";
 	}
 
 }

@@ -3,21 +3,23 @@ package edu.wiki.util.db;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.HashSet;
+import java.util.Set;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
-public class ArticleLengthQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Double>{
-	private static ArticleLengthQueryOptimizer instance;
+public class WikiConceptCategoryLinksQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Set<Integer>> {
+	private static WikiConceptCategoryLinksQueryOptimizer query;
 	
-	public static ArticleLengthQueryOptimizer getInstance() {
-		if (instance == null) {
-			instance = new ArticleLengthQueryOptimizer();
+	public static WikiConceptCategoryLinksQueryOptimizer getInstance() {
+		if (query == null) {
+			query = new WikiConceptCategoryLinksQueryOptimizer();
 		}
-		return instance;
+		return query;
 	}
 
-	private ArticleLengthQueryOptimizer() {
-		super("SELECT id, len FROM article_lengths WHERE id IN (?)");
+	private WikiConceptCategoryLinksQueryOptimizer() {
+		super("SELECT cl_from, cl_to FROM pagecategorylinks WHERE cl_from IN (?)");
 		setMaxCachEntries(100000);
 	}
 
@@ -35,9 +37,11 @@ public class ArticleLengthQueryOptimizer extends AbstractDBQueryOptimizer<Intege
 	}
 
 	@Override
-	protected Double getValueFromRs(ResultSet rs, Double oldValue) {
+	protected Set<Integer> getValueFromRs(ResultSet rs, Set<Integer> oldValue) {
 		try {
-			return rs.getDouble(2);
+			Set<Integer> set = oldValue == null ? new HashSet<>(): oldValue;
+			set.add(rs.getInt(2));
+			return set;
 		} catch (SQLException e) {
 			throw new RuntimeException(e);
 		}
@@ -54,7 +58,7 @@ public class ArticleLengthQueryOptimizer extends AbstractDBQueryOptimizer<Intege
 
 	@Override
 	public String getLoadAllQuery() {
-		return "SELECT id, len FROM article_lengths";
+		return "SELECT cl_from, cl_to FROM pagecategorylinks";
 	}
 
 }

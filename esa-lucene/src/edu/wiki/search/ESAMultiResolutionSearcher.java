@@ -56,6 +56,34 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		return vec;
 	}
 
+	public IConceptVector getConceptVectorUsingMultiResolution2(String doc, int conceptsLimit, boolean use2ndOrder, boolean useShortContexts) {
+		TIntDoubleHashMap result = new TIntDoubleHashMap();
+		
+		// get concepts from analyzing entire doc
+		getConceptVectorUsingMultiResolutionInternal2(doc, use2ndOrder, CONCEPTS_PER_LONG_CONTEXT, result);
+
+		// get concepts from analyzing paragraphs (approximated by using large window of words contexts)
+		Collection<String> paragraphs = WikiprepESAUtils.getWindowOfWordsContexts(Arrays.asList(doc), LARGE_WINDOW_OF_WORDS_WIDTH, 0);
+		paragraphs.forEach((paragraph) -> {
+			getConceptVectorUsingMultiResolutionInternal2(paragraph, use2ndOrder, CONCEPTS_PER_MED_CONTEXT, result);
+		});
+
+		// get concepts from analyzing window of words contexts (within paragraphs)
+		WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
+			getConceptVectorUsingMultiResolutionInternal2(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
+		});
+		
+		// build final vector
+		IConceptVector vec = new TroveConceptVector(result.size());
+		TIntDoubleIterator iter = result.iterator();
+		while(iter.hasNext()) {
+			iter.advance();
+			vec.set(iter.key(), iter.value());
+		}
+		vec = getNormalVector(vec, conceptsLimit);
+		return vec;
+	}
+
 	public IConceptVector getConceptVectorUsingMultiResolutionForWikipedia(String doc, int conceptsLimit, boolean use2ndOrder, boolean useShortContexts) {
 		TIntDoubleHashMap result = new TIntDoubleHashMap();
 		
@@ -108,4 +136,28 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		}
 	}
 	
+	private void getConceptVectorUsingMultiResolutionInternal2(
+			String context, 
+			boolean use2ndOrder, 
+			int maxConcepts,
+			TIntDoubleHashMap result) {
+		IConceptVector v = getConceptVector2(context);
+		v = use2ndOrder ? 
+				getCombinedVector(v, maxConcepts) : 
+				getNormalVector(v, maxConcepts);
+		
+		if (v == null || v.count() == 0) {
+			return;
+		}
+		
+		IConceptIterator iter = v.bestKOrderedIterator(maxConcepts);
+		while (iter.next()) {
+			int conceptId = iter.getId();
+			double conceptScore = iter.getValue();
+			if (!result.containsKey(conceptId) ||
+					result.get(conceptId) < conceptScore) {
+				result.put(conceptId, conceptScore);
+			}
+		}
+	}
 }

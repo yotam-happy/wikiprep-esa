@@ -27,6 +27,10 @@ public class Cluster<T> {
 	public synchronized void setPoints(List<T> points) {
 		this.points = points;
 	}
+	
+	public void setId(int id){
+		this.id = id;
+	}
  
 	public T getCentroid() {
 		return centroid;

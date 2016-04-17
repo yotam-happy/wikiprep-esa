@@ -97,7 +97,7 @@ public class ESAAnalyzeSelf {
 					task.tuples.stream().forEach((tuple) -> {
 						try {
 							// Dont use second order....
-							IConceptVector vector = searcher.getConceptVectorUsingMultiResolutionForWikipedia(tuple.y, 1000, true, false);
+							IConceptVector vector = searcher.getConceptVectorUsingMultiResolutionForWikipedia(tuple.y, 1000, false, false);
 							
 							// write concept id
 							dos.writeInt(tuple.x);

@@ -11,10 +11,10 @@ package edu.wiki.clustering.kmeans;
 import edu.wiki.util.Tuple;
 import edu.wiki.util.counting.Counting;
 import gnu.trove.TIntHashSet;
-import gnu.trove.TIntIterator;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -121,11 +121,14 @@ public class KMeans<T> {
         	assignCluster(true);
             
             //Calculate new centroids.
+        	int cid = 0;
         	for(Iterator<Cluster<T>> it = clusters.iterator(); it.hasNext(); ){
         		Cluster<T> cluster = it.next();
                 T centroid = centroidCalc.apply(cluster.getPoints());
                 if(centroid != null) {
                 	cluster.setCentroid(centroid);
+                	cluster.setId(cid);
+                	cid++;
                 } else {
                 	it.remove();
                 }
@@ -165,48 +168,63 @@ public class KMeans<T> {
     	}
     }
     
-    private boolean isConstraintViolated(int pointId, Cluster<T> cluster) {
+    private int countConstraintViolations(int pointId, Cluster<T> cluster) {
+    	int violations = 0;
     	// must link
     	if (mustLink.containsKey(pointId)){
-    		TIntIterator it = mustLink.get(pointId).iterator();
-    		while(it.hasNext()){
-    			if (!cluster.getPoints().contains(it.next())){
-    				return false;
-    			}
-    		}
+    		throw new RuntimeException("must link constraint not supported");
+    		// TODO: this is wrong! need to check only points that
+    		// are already assigned
+//    		TIntIterator it = mustLink.get(pointId).iterator();
+//    		while(it.hasNext()){
+//    			if (!cluster.getPoints().contains(it.next())){
+//    				violations++;
+//    			}
+//    		}
     	}
     	// cannot link
     	if (cannotLink.containsKey(pointId)){
-    		TIntIterator it = cannotLink.get(pointId).iterator();
+    		Iterator<T> it = cluster.getPoints().iterator();
     		while(it.hasNext()){
-    			if (cluster.getPoints().contains(it.next())){
-    				return false;
+    			T t = it.next();
+    			int id = getIdFunc.apply(t);
+    			if (cannotLink.get(pointId).contains(id)){
+    				violations++;
     			}
     		}
     	}
-    	return true;
+    	return violations;
     }
     
     public Tuple<Integer,Double> getBestCluster(T point){
-    	List<Tuple<Integer,Double>> l = clusters.stream()
+    	List<Tuple<Integer,Double>> l = clusters.parallelStream()
 			.map((cluster)->new Tuple<Integer,Double>(cluster.id,metric.apply(point, cluster.getCentroid())))
 	    	.sorted((e1,e2)->Double.compare(e1.y, e2.y)).collect(Collectors.toList());
     	
-    	if (getIdFunc == null){
+    	if (getIdFunc == null || getIdFunc.apply(point) == -1){
+    		if (l.get(0).y.isNaN()){
+    			return null;
+    		}
     		return l.get(0);
     	} else {
+    		// this is horrible... it is: Tuple<clusterId,Tuple<nViolations,distanceFromCentroid>>
+    		Set<Tuple<Integer,Tuple<Integer,Double>>> order = new HashSet<>();
+    		
     		for(Tuple<Integer,Double> t : l){
-    			if (!isConstraintViolated(getIdFunc.apply(point), clusters.get(t.x))){
-    				return t;
-    			}
+    			int violations = countConstraintViolations(getIdFunc.apply(point), clusters.get(t.x)); 
+    			order.add(new Tuple<>(t.x, new Tuple<>(violations, t.y)));
     		}
+    		Tuple<Integer,Tuple<Integer,Double>> best = order.stream().sorted((e1,e2)->{
+    			int cmp1 = e1.y.x.compareTo(e2.y.x);
+    			return cmp1 != 0 ? cmp1 : e1.y.y.compareTo(e2.y.y);
+    		}).findFirst().orElse(null);
+    		return new Tuple<>(best.x, best.y.y);
     	}
-    	throw new RuntimeException("Could not finish clustering due to constraint problems");
     }
     
     private void assignCluster(boolean partial) {
     	Counting counter = new Counting(10000, "Assigning clusters"); 
-        points.parallelStream()
+        points.stream()
         .forEach((point)->{
     		Tuple<Integer,Double> t = getBestCluster(point);
             if (t != null){

@@ -2,7 +2,12 @@ package edu.wiki.util;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.function.Consumer;
+
+import edu.wiki.util.counting.Counting;
 
 public class WikiprepESAdb {
 	static WikiprepESAdb wikiprepESAdb; 
@@ -36,6 +41,29 @@ public class WikiprepESAdb {
 	
 	public Connection getConnection() {
 		return connection;
+	}
+	
+	/**
+	 * This method uses jdbc api to read the records one by one. This has the effect of blocking
+	 * the connections for further queries until this operation finishes so be warned 
+	 */
+	public void forEachResult(String query, Consumer<ResultSet> consumer){
+		try {
+			Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
+			stmt = WikiprepESAdb.getInstance().getConnection()
+					.createStatement(java.sql.ResultSet.TYPE_FORWARD_ONLY, java.sql.ResultSet.CONCUR_READ_ONLY);
+			stmt.setFetchSize(Integer.MIN_VALUE);
+			
+			stmt.execute(query);
+			ResultSet rs = stmt.getResultSet();
+			Counting c = new Counting(10);
+			while(rs.next()) {
+				consumer.accept(rs);
+				c.addOne();
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException(e);
+		}
 	}
 
 }

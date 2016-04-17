@@ -9,13 +9,13 @@ import edu.wiki.util.AbstractDBQueryOptimizer;
 
 public class TermQueryOptimizer extends AbstractDBQueryOptimizer<String, byte[]> {
 
-	private static TermQueryOptimizer termQueryOptimizer;
+	private static TermQueryOptimizer query;
 	
 	public static TermQueryOptimizer getInstance() {
-		if (termQueryOptimizer == null) {
-			termQueryOptimizer = new TermQueryOptimizer();
+		if (query == null) {
+			query = new TermQueryOptimizer();
 		}
-		return termQueryOptimizer;
+		return query;
 	}
 
 	private TermQueryOptimizer() {

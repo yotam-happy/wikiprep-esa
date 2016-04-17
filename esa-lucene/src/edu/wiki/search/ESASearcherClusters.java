@@ -1,7 +1,9 @@
 package edu.wiki.search;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
@@ -14,14 +16,17 @@ import edu.wiki.util.db.ClusterMembershipQueryOptimizer;
 import edu.wiki.util.db.ClusterSizeQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.InlinkQueryOptimizer;
+import gnu.trove.THashMap;
 
 public class ESASearcherClusters {
 	ESASearcher searcher;
 	Map<Integer, IConceptVector> centroids;
 	Map<Integer,Double> idf;
+	String baseTableName;
 	
-	public ESASearcherClusters() {
-		ClusterCentroidsQueryOptimizer query = ClusterCentroidsQueryOptimizer.getInstance();
+	public ESASearcherClusters(String baseTableName) {
+		this.baseTableName = baseTableName;
+		ClusterCentroidsQueryOptimizer query = ClusterCentroidsQueryOptimizer.getInstance(baseTableName);
 		searcher = new ESASearcher();
 		query.loadAll();
 		centroids = new HashMap<>();
@@ -56,26 +61,32 @@ public class ESASearcherClusters {
 
 	public IConceptVector ClustersFeatureVectorByMembership(IConceptVector vec, int normalize) {
 		IConceptVector vec2 = new TroveConceptVector(100);
-		ClusterMembershipQueryOptimizer query = ClusterMembershipQueryOptimizer.getInstance();
-		
+		ClusterMembershipQueryOptimizer query = ClusterMembershipQueryOptimizer.getInstance(baseTableName);
+		if(vec == null){
+			return vec2;
+		}
+
+		Set<Integer> s = new HashSet<>();
 		IConceptIterator it = vec.iterator();
 		while(it.next()){
-			MembershipData clusterData = query.doQuery(it.getId());
-			if (clusterData != null) {
-				Double norm = 1.0;
-				switch(normalize){
-				case 1:
-					norm = ArticleLengthQueryOptimizer.getInstance().doQuery(it.getId()) /
-							ClusterLengthQueryOptimizer.getInstance().doQuery(clusterData.cluster);
-					break;
-				case 2:
-					norm = ArticleLengthQueryOptimizer.getInstance().doQuery(it.getId()) *
-							((double)ClusterSizeQueryOptimizer.getInstance().doQuery(clusterData.cluster) /
-							ClusterLengthQueryOptimizer.getInstance().doQuery(clusterData.cluster));
-				}
-				vec2.add(clusterData.cluster, it.getValue() * norm);
-			}
+			s.add(it.getId());
 		}
+    	THashMap<Integer, MembershipData> clusterData = query.doQuery(s);
+		
+    	clusterData.forEach((d,x)->{
+			Double norm = 1.0;
+			switch(normalize){
+			case 1:
+				norm = ArticleLengthQueryOptimizer.getInstance().doQuery(it.getId()) /
+						ClusterLengthQueryOptimizer.getInstance(baseTableName).doQuery(x.cluster);
+				break;
+			case 2:
+				norm = ArticleLengthQueryOptimizer.getInstance().doQuery(it.getId()) *
+						((double)ClusterSizeQueryOptimizer.getInstance(baseTableName).doQuery(x.cluster) /
+						ClusterLengthQueryOptimizer.getInstance(baseTableName).doQuery(x.cluster));
+			}
+			vec2.add(x.cluster, it.getValue() * norm);
+    	});
 		return vec2;
 	}
 	

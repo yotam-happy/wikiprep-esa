@@ -1,29 +1,29 @@
 package edu.wiki.util.db;
 
+import java.io.UnsupportedEncodingException;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 
 import edu.wiki.util.AbstractDBQueryOptimizer;
 
-public class ArticleLengthQueryOptimizer extends AbstractDBQueryOptimizer<Integer, Double>{
-	private static ArticleLengthQueryOptimizer instance;
+public class WikiCategoryNamesQueryOptimizer extends AbstractDBQueryOptimizer<Integer, String>{
+	private static WikiCategoryNamesQueryOptimizer query;
 	
-	public static ArticleLengthQueryOptimizer getInstance() {
-		if (instance == null) {
-			instance = new ArticleLengthQueryOptimizer();
+	public static WikiCategoryNamesQueryOptimizer getInstance() {
+		if (query == null) {
+			query = new WikiCategoryNamesQueryOptimizer();
 		}
-		return instance;
+		return query;
 	}
 
-	private ArticleLengthQueryOptimizer() {
-		super("SELECT id, len FROM article_lengths WHERE id IN (?)");
-		setMaxCachEntries(100000);
+	private WikiCategoryNamesQueryOptimizer() {
+		super("SELECT cat_id, cat_title FROM category WHERE cat_id IN (?)");
 	}
 
 	@Override
 	protected void setKeyInPstmt(PreparedStatement pstmt, int pos, Integer key) {
-		try {
+        try {
 			if (key == null) {
 				pstmt.setNull(pos, java.sql.Types.INTEGER);
 			} else {
@@ -35,10 +35,10 @@ public class ArticleLengthQueryOptimizer extends AbstractDBQueryOptimizer<Intege
 	}
 
 	@Override
-	protected Double getValueFromRs(ResultSet rs, Double oldValue) {
+	protected String getValueFromRs(ResultSet rs, String oldValue) {
 		try {
-			return rs.getDouble(2);
-		} catch (SQLException e) {
+			return new String(rs.getBytes(2), "UTF-8");
+		} catch (SQLException | UnsupportedEncodingException e) {
 			throw new RuntimeException(e);
 		}
 	}
@@ -54,7 +54,6 @@ public class ArticleLengthQueryOptimizer extends AbstractDBQueryOptimizer<Intege
 
 	@Override
 	public String getLoadAllQuery() {
-		return "SELECT id, len FROM article_lengths";
+		return "SELECT cat_id, cat_title FROM category";
 	}
-
 }

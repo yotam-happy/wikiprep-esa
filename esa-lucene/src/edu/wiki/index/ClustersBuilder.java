@@ -40,10 +40,10 @@ import edu.wiki.util.db.InlinkQueryOptimizer;
 
 
 public class ClustersBuilder {
-	static int MIN_INLINKS_TO_PARTICIPATE = 40;
-	static int MAX_TERMS_PER_VECTOR = 1000;
-
-	String baseTableName;
+	private int minInlinksToParticipate = 40;
+	static final int MAX_TERMS_PER_VECTOR = 1000;
+	static final int MAX_ITERATIONS = 20;
+	
 	ESASearcher searcher;
 	KMeans<ArrayListConceptVector> kMeans = null;
 	Map<Integer,Tuple<Integer,Double>> allMappings = null;
@@ -52,21 +52,29 @@ public class ClustersBuilder {
 	Set<Tuple<Integer,Integer>> mustLink; 
 	Set<Tuple<Integer,Integer>> cannotLink;
 	
-	public ClustersBuilder(String baseTableName){
-		this.baseTableName = baseTableName;
+	public ClustersBuilder(){
 		searcher = new ESASearcher();
 	}
 
 	public static void main(String[] args) {
-		ClustersBuilder clustersBuilder = new ClustersBuilder(args[0]);
-		clustersBuilder.buildClusters();
-		clustersBuilder.saveClustersToDb();
+		ClustersBuilder clustersBuilder = new ClustersBuilder();
+		clustersBuilder.loadVectors();
+		
+		int[] nofclusters = {2,4,8,16,32,64,128,256,512,1024,2048};
+		for(int n : nofclusters){
+			System.out.println("do clustering with " + n + " clusters");
+			clustersBuilder.buildClusters(n);
+			clustersBuilder.saveClustersToDb(args[0] + n);
+		}
 	}
-
-	static int count;
-	public void buildClusters() {
+	List<ArrayListConceptVector> vectors = null;
+	public void loadVectors() {
 		InlinkQueryOptimizer.getInstance().loadAll();
-		List<ArrayListConceptVector> vectors = loadConceptVectors();
+		vectors = loadConceptVectors();
+	}
+	
+	static int count;
+	public void buildClusters(int nClusters) {
 		
 		BiFunction<ArrayListConceptVector, ArrayListConceptVector, Double> metric = (c1,c2) -> {
 			return searcher.getCosineDistanceFast(c1, c2);
@@ -81,18 +89,21 @@ public class ClustersBuilder {
 			}
 			centroid.multipty((float)(1.0 / arr.size()));
 			centroid = new ArrayListConceptVector(
-					searcher.getNormalVector(centroid, 50));
+					searcher.getNormalVector(centroid, 200));
 			return centroid;
 		};
 		
 		System.out.println("Donig KMeans clustering");
-		kMeans = new KMeans<>(4000, vectors, metric, centroidCalc, 20);
+		kMeans = new KMeans<>(nClusters, vectors, metric, centroidCalc, MAX_ITERATIONS);
 		
 		if(biasVectors != null){
 			kMeans.setConstraints(mustLink, cannotLink, (v)->{
 				Integer i = biasVectors.get(v);
 				return i == null ? -1 : i;
 			});
+			// these are copied by kmeans into it's own data structure
+			mustLink = null;
+			cannotLink = null;
 		}
 		
 		kMeans.calculate();
@@ -106,9 +117,12 @@ public class ClustersBuilder {
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
-			vec = searcher.getNormalVector(vec, 150);
+			vec = searcher.getNormalVector(vec, 350);
 			ArrayListConceptVector fastV = new ArrayListConceptVector(vec);
-			allMappings.put(id, kMeans.getBestCluster(fastV));
+			Tuple<Integer,Double> c = kMeans.getBestCluster(fastV);
+			if (c != null){
+				allMappings.put(id, c);
+			}
 			counter.addOne();
 		});
 	}
@@ -121,7 +135,7 @@ public class ClustersBuilder {
 		this.cannotLink = cannotLink;
 	}
 	
-	public void saveClustersToDb(){
+	public void saveClustersToDb(String baseTableName){
 		try {
 			// save to db
 			String clustersCentroidsTable = baseTableName + "_centroids";
@@ -205,7 +219,7 @@ public class ClustersBuilder {
 			fastV.normalizeLength();
 			fastV.setId(id);
 			
-        	if (InlinkQueryOptimizer.getInstance().doQuery(id) < MIN_INLINKS_TO_PARTICIPATE){
+        	if (InlinkQueryOptimizer.getInstance().doQuery(id) < minInlinksToParticipate){
         		return;
         	}
 			vectors.add(fastV);
@@ -215,8 +229,16 @@ public class ClustersBuilder {
 				System.out.println("loaded " + count);
 			}
 		});
+		if (biasVectors != null){
+			vectors.addAll(biasVectors.keySet());
+		}
 		return vectors;
 	}
+	
+	public void setMinInlinksToParticipate(int minInlinksToParticipate){
+		this.minInlinksToParticipate = minInlinksToParticipate;
+	}
+	
 	public static void forEachConcept(BiConsumer<Integer,byte[]> consumer){
 		try{
 			Statement stmt = WikiprepESAdb.getInstance().getConnection()
@@ -232,8 +254,12 @@ public class ClustersBuilder {
 		        rs.close();
 	        	stmt.close();
 			}catch(SQLException e) {
-		        rs.close();
-		        stmt.close();
+				if(rs != null){
+					rs.close();
+				}
+		        if (stmt != null) {
+		        	stmt.close();
+		        }
 				throw new RuntimeException(e);
 			}
 		}catch(SQLException e){

@@ -54,7 +54,7 @@ public class ArticleLength {
 		rs.close();
 		stmt.close();
 
-		ClusterMembershipQueryOptimizer query = ClusterMembershipQueryOptimizer.getInstance();
+		ClusterMembershipQueryOptimizer query = ClusterMembershipQueryOptimizer.getInstance(args[0]);
 		query.loadAll();
 		Map<Integer,Tuple<Double,Integer>> clusterLengths = new HashMap<>();
 		query.forEach((id,m)->{
