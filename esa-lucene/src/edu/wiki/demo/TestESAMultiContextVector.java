@@ -44,7 +44,6 @@ public class TestESAMultiContextVector extends AbstractTestClass{
 					+ " it has become an essential part of the technology industry, providing the heavy lifting for many"
 					+ " of the most challenging problems in computer science.[12]"; //in.readLine();
 			IConceptVector c = searcher.getConceptVectorUsingMultiResolution(text, 20, true, true);
-			System.out.println("cc " + c.count());
 			return c;
 		} catch (Exception e) {
 			throw new RuntimeException(e);

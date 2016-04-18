@@ -1,12 +1,13 @@
 package edu.wiki.concept;
 
 import java.util.Arrays;
+import java.util.List;
 
+import edu.clustering.jot.interfaces.Point;
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
-import edu.wiki.api.concept.IConceptVectorData;
+import edu.wiki.search.ESASearcher;
 import edu.wiki.util.MinHeapIntInt;
-import gnu.trove.TDoubleProcedure;
 
 /**
  * This implementation is good for very fast similarity measures.
@@ -14,27 +15,28 @@ import gnu.trove.TDoubleProcedure;
  * @author yotamesh
  *
  */
-public class ArrayListConceptVector implements IConceptVector{
+public class ArrayListConceptVector implements IConceptVector, Point{
 	private int[] ids;
 	private double[] scores;
 	private int size;
+	private double weight;
 	
 	private int id;
 	private String desc;
 	
-	public ArrayListConceptVector(int capacity ) {
-		this.size = 0;
+	public ArrayListConceptVector(int capacity) {
 		ids = new int[capacity];
 		scores = new double[capacity];
 		for(int i = 0; i < capacity; i++){
 			ids[i] = -1;
 		}
+		size = 0;
 	}
 	
 	public ArrayListConceptVector(IConceptVector v) {
-		size = v.count();
-		ids = new int[size];
-		scores = new double[size];
+		ids = new int[v.size()];
+		scores = new double[v.size()];
+		size = v.size();
 		
 		int c = 0;
 		IConceptIterator it = v.iterator();
@@ -43,7 +45,7 @@ public class ArrayListConceptVector implements IConceptVector{
 			c++;
 		}
 		Arrays.sort(ids);
-		for (int i = 0; i < size; i++){
+		for (int i = 0; i < v.size(); i++){
 			scores[i] = v.get(ids[i]);
 		}
 	}
@@ -69,7 +71,7 @@ public class ArrayListConceptVector implements IConceptVector{
 	}
 	
 	public void normalizeLength() {
-		double norm = this.getData().getNorm2();
+		double norm = norm2();
 		this.multipty((float)(1.0 / norm));
 	}
 	
@@ -79,18 +81,19 @@ public class ArrayListConceptVector implements IConceptVector{
 			scores = Arrays.copyOf(scores, ids.length + 1 + ids.length / 4);
 		}
 	}
+	
 	/**
 	 * This is very inefficient in this implementation.
 	 */
 	@Override
 	public void add(int key, double d) {
-		int pos = Arrays.binarySearch(ids, 0, size, key);
+		int pos = Arrays.binarySearch(ids, 0, size(), key);
 		if (pos >= 0) {
 			scores[pos] += d;
 		} else {
 			pos = -pos - 1; // get insertion point
-			maintainCapacity(size + 1);
-			for (int i = size - 1; i >= pos; i--) {
+			maintainCapacity(size() + 1);
+			for (int i = size() - 1; i >= pos; i--) {
 				ids[i + 1] = ids[i];
 				scores[i + 1] = scores[i];
 			}
@@ -106,6 +109,120 @@ public class ArrayListConceptVector implements IConceptVector{
 		while( it.next() ) {
 			add(it.getId(), it.getValue());
 		}
+	}
+
+	@Override
+	public double get( int key ) {
+		int i = Arrays.binarySearch(ids, 0, size(), key);
+		return i >= 0 ? scores[i] : 0.0;
+	}
+
+	@Override
+	public IConceptIterator iterator() {
+		return new ArrayListConceptVectorIterator();
+	}
+
+	@Override
+	public IConceptIterator orderedIterator() {
+		return new ArrayListConceptVectorOrderedIterator(ids, scores, size());
+	}
+	
+	public IConceptIterator bestKOrderedIterator(int nConcepts) {
+		return new ArrayListBestKOrderedIterator(ids, scores, size(), nConcepts);
+	}
+
+	@Override
+	public void set( int key, double d ) {
+		if (d == 0) {
+			// remove
+			int pos = Arrays.binarySearch(ids, 0, size(), key);
+			if (pos >= 0) {
+				for (int i = pos; i < size() - 1; i++){
+					ids[i] = ids[i+1];
+					scores[i] = scores[i+1];
+				}
+				size--;
+			}
+		} else {
+			int pos = Arrays.binarySearch(ids, 0, size(), key);
+			if (pos >= 0) {
+				scores[pos] = d;
+			} else {
+				add(key, d);
+			}
+		}
+	}
+
+	@Override
+	public int size() {
+		return size;
+	}
+
+	@Override
+	public void multipty(Float c) {
+		for (int i = 0; i < size(); i++) {
+			scores[i] *= c;
+		}
+	}
+
+	private class ArrayListConceptVectorIterator implements IConceptIterator {
+
+		int c = -1;
+		
+		private ArrayListConceptVectorIterator() {
+			reset();
+		}
+		
+		@Override
+		public int getId() {
+			return ids[c];
+		}
+
+		@Override
+		public double getValue() {
+			return scores[c];
+		}
+
+		@Override
+		public boolean next() {
+			c++;
+			if( c < size) {
+				return true;
+			}
+			return false;
+		}
+
+		@Override
+		public void reset() {
+			c = -1;
+		}
+		
+	}
+
+	@Override
+	public double norm2() {
+		double n = 0;
+		for (int i = 0; i < size; i++) {
+			n += scores[i] * scores[i];
+		}
+		return Math.sqrt(n);
+	}
+
+	@Override
+	public double getWeight() {
+		return weight;
+	}
+
+	@Override
+	public void setWeight(double weight) {
+		this.weight = weight;
+	}
+
+	@Override
+	public double metric(Point x, Point y) {
+		return ConceptVectorCosineSimilarity.cosineDistanceFast(
+				(ArrayListConceptVector)x,
+				(ArrayListConceptVector)y);
 	}
 
 	public static ArrayListConceptVector merge(ArrayListConceptVector[] vecs) {
@@ -154,149 +271,15 @@ public class ArrayListConceptVector implements IConceptVector{
 	}
 	
 	@Override
-	public int count() {
-		return size;
-	}
-
-	@Override
-	public double get( int key ) {
-		int i = Arrays.binarySearch(ids, 0, size, key);
-		return i >= 0 ? scores[i] : 0.0;
-	}
-
-	@Override
-	public IConceptVectorData getData() {
-		return new ArrayListConceptVectorData();
-	}
-
-	@Override
-	public IConceptIterator iterator() {
-		return new ArrayListConceptVectorIterator();
-	}
-
-	@Override
-	public IConceptIterator orderedIterator() {
-		return new ArrayListConceptVectorOrderedIterator(ids, scores, size);
-	}
-	
-	public IConceptIterator bestKOrderedIterator(int nConcepts) {
-		return new ArrayListBestKOrderedIterator(ids, scores, size, nConcepts);
-	}
-
-	@Override
-	public void set( int key, double d ) {
-		if (d == 0) {
-			// remove
-			int pos = Arrays.binarySearch(ids, 0, size, key);
-			if (pos >= 0) {
-				for (int i = pos; i < size - 1; i++){
-					ids[i] = ids[i+1];
-					scores[i] = scores[i+1];
-				}
-				size--;
-			}
-		} else {
-			int pos = Arrays.binarySearch(ids, 0, size, key);
-			if (pos >= 0) {
-				scores[pos] = d;
-			} else {
-				add(key, d);
-			}
+	public Point centroid(List<? extends Point> l) {
+		ArrayListConceptVector centroid = ArrayListConceptVector.
+				merge(l.toArray(new ArrayListConceptVector[l.size()]));
+		if (centroid == null){
+			return null;
 		}
-	}
-
-	@Override
-	public int size() {
-		return size;
-	}
-
-	@Override
-	public void multipty(Float c) {
-		for (int i = 0; i < size; i++) {
-			scores[i] *= c;
-		}
-	}
-
-	private class ArrayListConceptVectorData implements IConceptVectorData {
-		
-		public int getConceptCount() {
-			return size;
-		}
-		
-		public double getNorm1() {
-			NormProcedure n1 = new NormProcedure( 1 );
-			for (int i = 0; i < size; i++) {
-				n1.execute(scores[i]);
-			}
-			return n1.getNorm();
-		}
-		
-		public double getNorm2() {
-			NormProcedure n2 = new NormProcedure( 2 );
-			for (int i = 0; i < size; i++) {
-				n2.execute(scores[i]);
-			}
-			return n2.getNorm();
-		}
-		
-		private class NormProcedure implements TDoubleProcedure {
-
-			int p;
-			double sum;
-			
-			private NormProcedure( int p ) {
-				this.p = p;
-				sum = 0;
-			}
-			
-			@Override
-			public boolean execute( double value ) {
-				if( p == 1 ) {
-					sum += value;
-				}
-				else {
-					sum += Math.pow( value, p );
-				}
-				return true;
-			}
-			
-			private double getNorm() {
-				return Math.pow( sum, 1.0 / (double)p );
-			}
-		}
-	}
-	
-	private class ArrayListConceptVectorIterator implements IConceptIterator {
-
-		int c = -1;
-		
-		private ArrayListConceptVectorIterator() {
-			reset();
-		}
-		
-		@Override
-		public int getId() {
-			return ids[c];
-		}
-
-		@Override
-		public double getValue() {
-			return scores[c];
-		}
-
-		@Override
-		public boolean next() {
-			c++;
-			if( c < size) {
-				return true;
-			}
-			return false;
-		}
-
-		@Override
-		public void reset() {
-			c = -1;
-		}
-		
+		centroid.multipty((float)(1.0 / l.size()));
+		centroid = new ArrayListConceptVector(
+				ESASearcher.getNormalVector(centroid, 200));
+		return centroid;
 	}
 }

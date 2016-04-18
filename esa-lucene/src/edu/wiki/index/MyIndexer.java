@@ -5,11 +5,9 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -252,19 +250,4 @@ public class MyIndexer {
 		}
 		return terms;
 	}
-	
-	private void readFile1() throws IOException {
-		FileInputStream fis = new FileInputStream(tmpSorted);
-	 
-		//Construct BufferedReader from InputStreamReader
-		BufferedReader br = new BufferedReader(new InputStreamReader(fis));
-	 
-		String line = null;
-		int c = 0;
-		while ((line = br.readLine()) != null && c < 10000) {
-			System.out.println(line);
-			c++;
-		}
-	 
-		br.close();
-	}}
+}

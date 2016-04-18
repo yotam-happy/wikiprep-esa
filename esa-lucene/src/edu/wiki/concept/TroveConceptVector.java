@@ -4,8 +4,6 @@ import java.io.Serializable;
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
-import edu.wiki.api.concept.IConceptVectorData;
-import gnu.trove.TDoubleProcedure;
 import gnu.trove.TIntDoubleHashMap;
 import gnu.trove.TIntDoubleIterator;
 
@@ -14,12 +12,10 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 	private static final long serialVersionUID = 5228670885044409972L;
 
 	private TIntDoubleHashMap valueMap;
-	private int size;
 	private int id;
 	private String desc;
 	
 	public TroveConceptVector(int size ) {
-		this.size = size;
 		valueMap = new TIntDoubleHashMap(size);		
 	}
 	
@@ -37,18 +33,8 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 	}
 
 	@Override
-	public int count() {
-		return valueMap.size();
-	}
-
-	@Override
 	public double get( int key ) {
 		return valueMap.get( key );
-	}
-
-	@Override
-	public IConceptVectorData getData() {
-		return new TroveConceptVectorData();
 	}
 
 	@Override
@@ -77,7 +63,7 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 
 	@Override
 	public int size() {
-		return size;
+		return valueMap.size();
 	}
 
 	@Override
@@ -100,49 +86,16 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 		return desc;
 	}
 
-	private class TroveConceptVectorData implements IConceptVectorData {
+	@Override
+	public double norm2() {
+		double[] n = new double[1];
+		n[0] = 0;
+		valueMap.forEachValue((v) ->{
+			n[0] += v * v;
+			return true;
+		});
 		
-		public int getConceptCount() {
-			return valueMap.size();
-		}
-		
-		public double getNorm1() {
-			NormProcedure n1 = new NormProcedure( 1 );
-			valueMap.forEachValue( n1 );
-			return n1.getNorm();
-		}
-		
-		public double getNorm2() {
-			NormProcedure n2 = new NormProcedure( 2 );
-			valueMap.forEachValue( n2 );
-			return n2.getNorm();
-		}
-		
-		private class NormProcedure implements TDoubleProcedure {
-
-			int p;
-			double sum;
-			
-			private NormProcedure( int p ) {
-				this.p = p;
-				sum = 0;
-			}
-			
-			@Override
-			public boolean execute( double value ) {
-				if( p == 1 ) {
-					sum += value;
-				}
-				else {
-					sum += Math.pow( value, p );
-				}
-				return true;
-			}
-			
-			private double getNorm() {
-				return Math.pow( sum, 1.0 / (double)p );
-			}
-		}
+		return Math.sqrt(n[0]);
 	}
 	
 	private class TroveConceptVectorIterator implements IConceptIterator {

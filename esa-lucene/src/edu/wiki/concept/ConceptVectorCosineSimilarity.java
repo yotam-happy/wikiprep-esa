@@ -2,42 +2,35 @@ package edu.wiki.concept;
 
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
-import edu.wiki.api.concept.search.IScorer;
 
 
-public class ConceptVectorSimilarity {
+public class ConceptVectorCosineSimilarity {
 
-	IScorer m_scorer;
-	
-	public ConceptVectorSimilarity( IScorer scorer ) {
-		m_scorer = scorer;
-	}
-	
-	public double calcSimilarity( IConceptVector v0, IConceptVector v1 ) {
+	public static double cosineSimilarity( IConceptVector v0, IConceptVector v1 ) {
 		// Some speed optimization, can speed things up by a lot! 
-		if (v0.count() > v1.count()) {
+		if (v0.size() > v1.size()) {
 			IConceptVector tmp = v0;
 			v0 = v1;
 			v1 = tmp;
 		}
-		
-		m_scorer.reset( v0.getData(), v1.getData(), 1 );
-		
+
+		double d = 0;
 		IConceptIterator it0 = v0.iterator();
 		while( it0.next() ) {
 			double value1 = v1.get( it0.getId() );
 			if( value1 > 0 ) {
-				m_scorer.addConcept( it0.getId(), it0.getValue(), it0.getId(), value1, 1 );
+				d += it0.getValue() * value1;
 			}
 		}
-		
-		m_scorer.finalizeScore( v0.getData(), v1.getData() );
-		
-		return m_scorer.getScore();
+
+		d = d / (v0.norm2() * v1.norm2());
+
+		return d;
 	}
 	
-	public double calcSimilarityFast( ArrayListConceptVector v0, ArrayListConceptVector v1 ) {
-		m_scorer.reset( v0.getData(), v1.getData(), 1 );
+	public static double cosineSimilarityFast( ArrayListConceptVector v0, ArrayListConceptVector v1 ) {
+		
+		double d = 0, norm1 = 0, norm2 = 0;
 		
 		// when dealing with ArrayListConceptVector we are guarenteed the
 		// concepts are sorted by id
@@ -49,26 +42,37 @@ public class ConceptVectorSimilarity {
 		boolean done = false;
 		while(!done) {
 			if (it0.getId() == it1.getId()) {
-				m_scorer.addConcept( it0.getId(), it0.getValue(), it1.getId(), it1.getValue(), 1);
+				d += it0.getValue() * it1.getValue();
+				norm1 += it0.getValue() * it0.getValue();
+				norm2 += it1.getValue() * it1.getValue();
 				done = (!it0.next()) || (!it1.next());
 			} else {
-				done = it0.getId() < it1.getId() ? !it0.next() : !it1.next();
+				if (it0.getId() < it1.getId()){
+					norm1 += it0.getValue() * it0.getValue();
+					done = !it0.next();
+				}else{
+					norm2 += it1.getValue() * it1.getValue();
+					done = !it1.next();
+				}
 			}
 		}
+
+		d = d / (Math.sqrt(norm1) * Math.sqrt(norm2));
 		
-		m_scorer.finalizeScore( v0.getData(), v1.getData() );
-		
-		return m_scorer.getScore();
+		return d;
 	}
 	
 	/**
-	 * Assumes vector is normalized!!
+	 * Assumes vectors are normalized!!
 	 */
-	public double calcCosineDistanceFast( ArrayListConceptVector v0, ArrayListConceptVector v1 ) {
-		return Math.abs(Math.acos(calcSimilarityFast(v0, v1)));
+	public static double cosineDistanceFast( ArrayListConceptVector v0, ArrayListConceptVector v1 ) {
+		if(v0 == null || v1 == null){
+			throw new NullPointerException();
+		}
+		return Math.abs(Math.acos(cosineSimilarityFast(v0, v1)));
 	}
 	
-	public double calcCosineDistance( IConceptVector v0, IConceptVector v1 ) {
-		return Math.abs(Math.acos(calcSimilarity(v0, v1)));
+	public static double calcCosineDistance( IConceptVector v0, IConceptVector v1 ) {
+		return Math.abs(Math.acos(cosineSimilarity(v0, v1)));
 	}
 }

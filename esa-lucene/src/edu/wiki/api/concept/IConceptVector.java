@@ -16,11 +16,8 @@ public interface IConceptVector {
 
 	public IConceptIterator iterator();
 	
-	public IConceptVectorData getData();
-	
 	public int size();
-	
-	public int count();
+	double norm2();
 	
 	public IConceptIterator orderedIterator();
 	public IConceptIterator bestKOrderedIterator(int nConcepts);

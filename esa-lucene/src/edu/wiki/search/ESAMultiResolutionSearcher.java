@@ -121,7 +121,7 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 				getCombinedVector(context, maxConcepts) : 
 				getNormalVector(context, maxConcepts);
 		
-		if (v == null || v.count() == 0) {
+		if (v == null || v.size() == 0) {
 			return;
 		}
 		
@@ -146,7 +146,7 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 				getCombinedVector(v, maxConcepts) : 
 				getNormalVector(v, maxConcepts);
 		
-		if (v == null || v.count() == 0) {
+		if (v == null || v.size() == 0) {
 			return;
 		}
 		

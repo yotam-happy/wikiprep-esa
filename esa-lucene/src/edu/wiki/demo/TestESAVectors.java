@@ -18,7 +18,7 @@ public class TestESAVectors extends AbstractTestClass{
 			String text = "artificial intelligence";//in.readLine();
 			
 			IConceptVector cvBase = searcher.getConceptVector(text);
-			return searcher.getNormalVector(cvBase, MAX_CONCEPTS);
+			return ESASearcher.getNormalVector(cvBase, MAX_CONCEPTS);
 		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}

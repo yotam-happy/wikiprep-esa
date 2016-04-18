@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.DecimalFormat;
 
+import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESASearcher;
 
 public class TestWordsim353 {
@@ -31,7 +32,9 @@ public class TestWordsim353 {
 				if(parts.length != 3)
 					break;
 				
-				val = searcher.getRelatedness(parts[0], parts[1]);
+				IConceptVector v1 = searcher.getConceptVector(parts[0]);
+				IConceptVector v2 = searcher.getConceptVector(parts[1]);
+				val = searcher.getRelatedness(v1, v2);
 				
 				if(val == -1){
 					System.out.println(line + "\t0");

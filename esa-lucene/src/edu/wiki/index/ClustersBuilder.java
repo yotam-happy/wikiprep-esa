@@ -12,24 +12,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 
-
-
-
-
-
-
-
-
-
+import edu.clustering.jot.algorithms.AlgorithmConstructor;
+import edu.clustering.jot.interfaces.ClusteringAlgorithm;
+import edu.clustering.jot.kmeans.Cluster;
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
-import edu.wiki.clustering.kmeans.Cluster;
-import edu.wiki.clustering.kmeans.KMeans;
 import edu.wiki.concept.ArrayListConceptVector;
 import edu.wiki.search.ESASearcher;
 import edu.wiki.util.Tuple;
@@ -45,12 +34,9 @@ public class ClustersBuilder {
 	static final int MAX_ITERATIONS = 20;
 	
 	ESASearcher searcher;
-	KMeans<ArrayListConceptVector> kMeans = null;
+	ClusteringAlgorithm<ArrayListConceptVector> kMeans = null;
 	Map<Integer,Tuple<Integer,Double>> allMappings = null;
-	
-	Map<ArrayListConceptVector, Integer> biasVectors = null;
-	Set<Tuple<Integer,Integer>> mustLink; 
-	Set<Tuple<Integer,Integer>> cannotLink;
+	List<ArrayListConceptVector> vectors = null;
 	
 	public ClustersBuilder(){
 		searcher = new ESASearcher();
@@ -67,7 +53,7 @@ public class ClustersBuilder {
 			clustersBuilder.saveClustersToDb(args[0] + n);
 		}
 	}
-	List<ArrayListConceptVector> vectors = null;
+	
 	public void loadVectors() {
 		InlinkQueryOptimizer.getInstance().loadAll();
 		vectors = loadConceptVectors();
@@ -76,40 +62,15 @@ public class ClustersBuilder {
 	static int count;
 	public void buildClusters(int nClusters) {
 		
-		BiFunction<ArrayListConceptVector, ArrayListConceptVector, Double> metric = (c1,c2) -> {
-			return searcher.getCosineDistanceFast(c1, c2);
-		};
-		
-		Function<List<ArrayListConceptVector>, ArrayListConceptVector> centroidCalc = (arr) -> {
-			
-			ArrayListConceptVector centroid = ArrayListConceptVector.
-					merge(arr.toArray(new ArrayListConceptVector[arr.size()]));
-			if (centroid == null){
-				return null;
-			}
-			centroid.multipty((float)(1.0 / arr.size()));
-			centroid = new ArrayListConceptVector(
-					searcher.getNormalVector(centroid, 200));
-			return centroid;
-		};
-		
 		System.out.println("Donig KMeans clustering");
-		kMeans = new KMeans<>(nClusters, vectors, metric, centroidCalc, MAX_ITERATIONS);
+		kMeans = AlgorithmConstructor.getKMeans(20, 0.00001);
 		
-		if(biasVectors != null){
-			kMeans.setConstraints(mustLink, cannotLink, (v)->{
-				Integer i = biasVectors.get(v);
-				return i == null ? -1 : i;
-			});
-			// these are copied by kmeans into it's own data structure
-			mustLink = null;
-			cannotLink = null;
-		}
-		
-		kMeans.calculate();
+		kMeans.doClustering(nClusters, nClusters, vectors);
+		List<Cluster<ArrayListConceptVector>> clusters = kMeans.getClusters();
 
 		allMappings = new HashMap<>();
 		Counting counter = new Counting(10000, "Final mapping.");
+
 		forEachConcept((id,v)->{
 			IConceptVector vec;
 			try {
@@ -117,24 +78,19 @@ public class ClustersBuilder {
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
-			vec = searcher.getNormalVector(vec, 350);
+			vec = ESASearcher.getNormalVector(vec, 350);
 			ArrayListConceptVector fastV = new ArrayListConceptVector(vec);
-			Tuple<Integer,Double> c = kMeans.getBestCluster(fastV);
-			if (c != null){
-				allMappings.put(id, c);
-			}
+			allMappings.put(id, classifyToClusters(fastV, clusters));
 			counter.addOne();
 		});
 	}
-
-	public void addBias(Map<ArrayListConceptVector, Integer> biasVectors,
-			Set<Tuple<Integer,Integer>> mustLink, 
-    		Set<Tuple<Integer,Integer>> cannotLink){
-		this.biasVectors = biasVectors;
-		this.mustLink = mustLink;
-		this.cannotLink = cannotLink;
-	}
 	
+	public Tuple<Integer,Double> classifyToClusters(ArrayListConceptVector p, 
+			List<Cluster<ArrayListConceptVector>> cluters){
+		return cluters.stream().map((c)->new Tuple<Integer,Double>(c.id,c.getCentroid().distance(p)))
+		.max((t1,t2)->Double.compare(t1.y, t2.y)).orElse(null);
+	}
+
 	public void saveClustersToDb(String baseTableName){
 		try {
 			// save to db
@@ -165,9 +121,9 @@ public class ClustersBuilder {
 		    	DataOutputStream tmpdos = new DataOutputStream(baos);
 		    	
 		    	ArrayListConceptVector centroid = new ArrayListConceptVector(
-		    			searcher.getNormalVector(cluster.getCentroid(), 1000));
+		    			ESASearcher.getNormalVector(cluster.getCentroid(), 1000));
 		    	
-		    	tmpdos.writeInt(centroid.count());
+		    	tmpdos.writeInt(centroid.size());
 		    	IConceptIterator it = centroid.iterator();
 		    	while(it.next()){
 		    		tmpdos.writeInt(it.getId());
@@ -214,7 +170,7 @@ public class ClustersBuilder {
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
-			vec = searcher.getNormalVector(vec, 250);
+			vec = ESASearcher.getNormalVector(vec, 250);
 			ArrayListConceptVector fastV = new ArrayListConceptVector(vec);
 			fastV.normalizeLength();
 			fastV.setId(id);
@@ -229,9 +185,6 @@ public class ClustersBuilder {
 				System.out.println("loaded " + count);
 			}
 		});
-		if (biasVectors != null){
-			vectors.addAll(biasVectors.keySet());
-		}
 		return vectors;
 	}
 	

@@ -102,12 +102,12 @@ public class ESAAnalyzeSelf {
 							// write concept id
 							dos.writeInt(tuple.x);
 							// prune this vector at 1000
-					    	int max = vector.count() < MAX_TERMS_PER_VECTOR ? vector.count() : MAX_TERMS_PER_VECTOR; 
+					    	int max = vector.size() < MAX_TERMS_PER_VECTOR ? vector.size() : MAX_TERMS_PER_VECTOR; 
 					    	// write vector
 					    	dos.writeInt(max);
 					    	int count = 0;
 					    	// Use orderedIterator sparingly... Only if necessary 
-					    	IConceptIterator iter = vector.count() > MAX_TERMS_PER_VECTOR ? 
+					    	IConceptIterator iter = vector.size() > MAX_TERMS_PER_VECTOR ? 
 					    			vector.bestKOrderedIterator(MAX_TERMS_PER_VECTOR) : vector.iterator();
 					    	while(iter.next() && count < MAX_TERMS_PER_VECTOR) {
 					    		dos.writeInt(iter.getId());

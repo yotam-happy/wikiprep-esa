@@ -12,18 +12,12 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-
-
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
 
-
-
 import edu.wiki.api.concept.IConceptIterator;
 import edu.wiki.api.concept.IConceptVector;
-import edu.wiki.api.concept.scorer.CosineScorer;
-import edu.wiki.concept.ArrayListConceptVector;
-import edu.wiki.concept.ConceptVectorSimilarity;
+import edu.wiki.concept.ConceptVectorCosineSimilarity;
 import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.InplaceSorts;
@@ -49,8 +43,6 @@ public class ESASearcher {
 	
 	static final float LINK_ALPHA = 0.5f;
 	
-	ConceptVectorSimilarity sim = new ConceptVectorSimilarity(new CosineScorer());
-		
 	public ESASearcher() {
 		analyzer = new WikipediaAnalyzer();
 	}
@@ -182,20 +174,6 @@ public class ESASearcher {
 		return newCv;
 	}
 
-	Map<String, Double> simCache = new HashMap<String, Double>();
-
-	public double getTermSimilarity(String t1, String t2){
-		Double d = simCache.get(t1 + "$" + t2);
-		if (d == null){
-			d = this.getCosineDistance(t1, t2);
-			if(simCache.size() > 10000){
-				simCache.clear();
-			}
-			simCache.put(t1+""+t2, d);
-		}
-		return d;
-	}
-	
 	private double linearTransform(double x, double domainLow, double domainHigh){
 		return x < domainLow ? 0 : 
 			(x > domainHigh ? 1 : 
@@ -367,14 +345,14 @@ public class ESASearcher {
 	 * @param cv
 	 * @return
 	 */
-	public IConceptVector getNormalVector(IConceptVector cv, int LIMIT){
+	public static IConceptVector getNormalVector(IConceptVector cv, int LIMIT){
 		IConceptVector cv_normal = new TroveConceptVector( LIMIT);
 		IConceptIterator it;
 		
 		if(cv == null)
 			return null;
 		
-		if (cv.count() <= LIMIT) {
+		if (cv.size() <= LIMIT) {
 			return cv;
 		}
 		
@@ -498,61 +476,7 @@ public class ESASearcher {
 		return getConceptESAVector(map.get(conceptId));
 	}
 	
-	public double getRelatednessFast(ArrayListConceptVector v1, ArrayListConceptVector v2){
-		if(v1 == null || v2 == null){
-			return -1;
-		}
-		return sim.calcSimilarityFast(v1, v2);
+	public double getRelatedness(IConceptVector v1,IConceptVector v2){
+		return ConceptVectorCosineSimilarity.cosineSimilarity(v1,v2);
 	}
-
-	public double getCosineDistanceFast(ArrayListConceptVector v1, ArrayListConceptVector v2){
-		if(v1 == null || v2 == null){
-			return -1;
-		}
-		return sim.calcCosineDistanceFast(v1, v2);
-	}
-
-	public double getCosineDistance(IConceptVector v1, IConceptVector v2){
-		if(v1 == null || v2 == null){
-			return -1;
-		}
-		return sim.calcCosineDistance(v1, v2);
-	}
-
-	public double getCosineDistance(String doc1, String doc2){
-		try {
-			IConceptVector c1 = getConceptVector(doc1);
-			IConceptVector c2 = getConceptVector(doc2);
-			return getCosineDistance(c1, c2);
-		}
-		catch(Exception e){
-			throw new RuntimeException(e);
-		}
-
-	}
-
-	public double getRelatedness(IConceptVector v1, IConceptVector v2){
-		if(v1 == null || v2 == null){
-			return -1;
-		}
-		return sim.calcSimilarity(v1, v2);
-	}
-	/**
-	 * Calculate semantic relatedness between documents
-	 * @param doc1
-	 * @param doc2
-	 * @return returns relatedness if successful, -1 otherwise
-	 */
-	public double getRelatedness(String doc1, String doc2){
-		try {
-			IConceptVector c1 = getConceptVector(doc1);
-			IConceptVector c2 = getConceptVector(doc2);
-			return getRelatedness(c1, c2);
-		}
-		catch(Exception e){
-			throw new RuntimeException(e);
-		}
-
-	}
-
 }
