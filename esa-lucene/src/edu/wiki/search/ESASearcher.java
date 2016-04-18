@@ -2,9 +2,6 @@ package edu.wiki.search;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -22,7 +19,6 @@ import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.InplaceSorts;
 import edu.wiki.util.TermVectorIterator;
-import edu.wiki.util.WikiprepESAdb;
 import edu.wiki.util.db.ArticleLengthQueryOptimizer;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
@@ -46,29 +42,6 @@ public class ESASearcher {
 	public ESASearcher() {
 		analyzer = new WikipediaAnalyzer();
 	}
-    void compare(ArrayList<String> termList, THashMap<String,byte[]> termVectors) {
-		try {
-			PreparedStatement pstmt = WikiprepESAdb.getInstance().getConnection()
-					.prepareStatement("SELECT t.term FROM idx t WHERE t.term=?");
-
-			termList.forEach((t)->{
-	    		try {
-					pstmt.setString(1, t);
-					pstmt.executeQuery();
-			        ResultSet rs = pstmt.getResultSet();
-			        boolean is = rs.next();
-					if (is != (termVectors.get(t) != null)){
-						System.out.println("Could not get term: " + t);
-					}
-				} catch (Exception e) {
-					throw new RuntimeException(e);
-				}
-	    	});
-			
-		} catch (SQLException e) {
-			throw new RuntimeException(e);
-		}    	
-    }
 	
 	/**
 	 * Retrieves full vector for regular features
@@ -140,9 +113,6 @@ public class ESASearcher {
         THashMap<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
         		.doQuery(new HashSet<String>(termList));
 
-        // TODO:Remove this test
-        compare(termList, termVectors);
-        
         termVectors.forEach((k,v) -> {
         	try {
             	TermVectorIterator iter = new TermVectorIterator(v);
