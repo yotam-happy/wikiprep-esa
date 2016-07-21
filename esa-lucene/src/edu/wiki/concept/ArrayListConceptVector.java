@@ -1,5 +1,6 @@
 package edu.wiki.concept;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.List;
 
@@ -15,7 +16,9 @@ import edu.wiki.util.MinHeapIntInt;
  * @author yotamesh
  *
  */
-public class ArrayListConceptVector implements IConceptVector, Point{
+public class ArrayListConceptVector implements IConceptVector, Point, Serializable{
+	private static final long serialVersionUID = 6240666456673025372L;
+
 	private int[] ids;
 	private double[] scores;
 	private int size;
@@ -159,7 +162,7 @@ public class ArrayListConceptVector implements IConceptVector, Point{
 	}
 
 	@Override
-	public void multipty(Float c) {
+	public void multipty(double c) {
 		for (int i = 0; i < size(); i++) {
 			scores[i] *= c;
 		}
@@ -220,9 +223,10 @@ public class ArrayListConceptVector implements IConceptVector, Point{
 
 	@Override
 	public double metric(Point x, Point y) {
-		return ConceptVectorCosineSimilarity.cosineDistanceFast(
+		double d = ConceptVectorCosineSimilarity.cosineDistanceFast(
 				(ArrayListConceptVector)x,
 				(ArrayListConceptVector)y);
+		return d;
 	}
 
 	public static ArrayListConceptVector merge(ArrayListConceptVector[] vecs) {
@@ -279,7 +283,7 @@ public class ArrayListConceptVector implements IConceptVector, Point{
 		}
 		centroid.multipty((float)(1.0 / l.size()));
 		centroid = new ArrayListConceptVector(
-				ESASearcher.getNormalVector(centroid, 200));
+				ESASearcher.getNormalVector(centroid, 5000));
 		return centroid;
 	}
 }

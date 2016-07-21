@@ -1,5 +1,7 @@
 package edu.wiki.api.concept;
 
+import java.util.function.BiConsumer;
+
 
 
 public interface IConceptVector {
@@ -12,7 +14,7 @@ public interface IConceptVector {
 	
 	public void add( IConceptVector v );
 	
-	public void multipty(Float c);
+	public void multipty(double c);
 
 	public IConceptIterator iterator();
 	
@@ -27,5 +29,12 @@ public interface IConceptVector {
 	public int getId();
 	public void setDesc(String desc);
 	public String getDesc();
+	
+	default public void forEach(BiConsumer<Integer,Double> consumer){
+		IConceptIterator it = iterator();
+		while(it.next()){
+			consumer.accept(it.getId(), it.getValue());
+		}
+	}
 
 }

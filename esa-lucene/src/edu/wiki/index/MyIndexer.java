@@ -29,6 +29,8 @@ import edu.wiki.util.counting.Counting;
 public class MyIndexer {
 	File tmp, tmpSorted; 
 	
+	int ngram = 2;
+	
 	MyIndexer() throws IOException{
 		tmp = new File("myindexer.tmp");
 		tmpSorted = new File("myindexer.sorted.tmp");
@@ -38,19 +40,23 @@ public class MyIndexer {
 	
 	public static void main(String[] args) throws IOException, InterruptedException, SQLException{
 		MyIndexer indexer = new MyIndexer();
-//		indexer.documentsToTermFile();
-//		indexer.sortTermFile();
+		indexer.documentsToTermFile();
+		indexer.sortTermFile();
 //		indexer.readFile1();
 		indexer.sortedTermFileToDB();
 	}
 	static final int MIN_COUNT = 3;
+	static final int MIN_DOC_SIZE = 100;
 	void documentsToTermFile() throws IOException {
 		int[] nDocs = new int[1];
 		
 		Map<String, Double> termDf = new HashMap<>();
 		System.out.println("Calculating term df");
 		forEachWikiDocuments((id,txt)->{
-			Map<String,Double> terms = tokenizeQuery(txt);
+			Map<String,Double> terms = tokenizeQuery(txt, ngram);
+			if (terms.entrySet().stream().mapToDouble((e)->e.getValue()).sum() < MIN_DOC_SIZE){
+				return;
+			}
 			nDocs[0]++;
 			terms.forEach((term,count)->{
 					Double d = termDf.get(term);
@@ -61,8 +67,12 @@ public class MyIndexer {
 		System.out.println("Writing term tf-idf to file");
 		FileWriter fw = new FileWriter(tmp);
 		forEachWikiDocuments((id,txt)->{
-			Map<String,Double> terms = tokenizeQuery(txt);
+			Map<String,Double> terms = tokenizeQuery(txt, ngram);
 			
+			if (terms.entrySet().stream().mapToDouble((e)->e.getValue()).sum() < MIN_DOC_SIZE){
+				return;
+			}
+
 			Double tot = Math.sqrt(terms.entrySet().stream()
 			.mapToDouble((e)->{
 				if (termDf.get(e.getKey()) <= MIN_COUNT){
@@ -118,12 +128,13 @@ public class MyIndexer {
     	pstmtWrite.execute();
 	}
 	PreparedStatement pstmtWrite = null;
-	String strVectorInsert = "INSERT INTO idx (term,vector) VALUES (?,?)";
+	String tableName = "idx" + (ngram > 1 ? "_" + ngram : "");
+	String strVectorInsert = "INSERT INTO " + tableName + " (term,vector) VALUES (?,?)";
 	
 	void sortedTermFileToDB() throws IOException, SQLException{
 		Statement stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
-		stmt.execute("DROP TABLE IF EXISTS idx");
-		stmt.execute("CREATE TABLE idx (" +
+		stmt.execute("DROP TABLE IF EXISTS " + tableName);
+		stmt.execute("CREATE TABLE " + tableName + " (" +
 				"term VARBINARY(255)," +
 				"vector MEDIUMBLOB " +
 				") DEFAULT CHARSET=binary");
@@ -173,7 +184,7 @@ public class MyIndexer {
 		WikiprepESAdb.getInstance().getConnection().setAutoCommit(false);
 		
 		stmt = WikiprepESAdb.getInstance().getConnection().createStatement();
-		stmt.execute("ALTER TABLE idx " +
+		stmt.execute("ALTER TABLE " + tableName + " " +
 				"ADD PRIMARY KEY (term)");
 		stmt.close();
 	}
@@ -227,7 +238,8 @@ public class MyIndexer {
 		return true;
 	}
 	
-	Map<String,Double> tokenizeQuery(String query){
+	Map<String,Double> tokenizeQuery(String query, int ngram){
+		String[] grams = new String[ngram]; 
 		Map<String,Double> terms = new HashMap<>();
         TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
         try {
@@ -239,8 +251,18 @@ public class MyIndexer {
 	            if (t == null || t.isEmpty() || filterToken(t)){
 	            	continue;
 	            }
-	            Double d = terms.get(t);
-	            terms.put(t, d == null ? 1 : d + 1);
+	            for(int i = 0; i < ngram - 1; i++){
+	            	grams[i] = grams[i+1];
+	            }
+	            grams[ngram-1] = t;
+	            if(grams[0] != null){
+	            	String g = "";
+	            	for(int i = 0; i < ngram; i++){
+	            		g += (i != 0 ? "_" : "") + grams[i];
+	            	}
+		            Double d = terms.get(g);
+		            terms.put(g, d == null ? 1 : d + 1);
+	            }
 	        }
 	                
 	        ts.end();

@@ -55,45 +55,6 @@ public class WikipediaAnalyzer extends Analyzer {
 		}
 	}
 
-	
-    public TokenStream reusableTokenStream(
-        String fieldName, Reader reader) {
-
-        SavedStreams streams =
-            (SavedStreams) getPreviousTokenStream();
-
-        if (streams == null) {
-            streams = new SavedStreams();
-            setPreviousTokenStream(streams);
-
-            // streams.tokenizer = new LetterTokenizer(reader);
-            streams.tokenizer = new CustomTokenizer(reader);
-            
-            streams.stream = new StandardFilter(streams.tokenizer);
-            streams.stream = new LengthFilter(streams.stream, 3, 100);
-            streams.stream = new LowerCaseFilter(streams.stream);
-            // streams.stream = new StopFilter(true, streams.stream, StopAnalyzer.ENGLISH_STOP_WORDS_SET);
-            streams.stream = new StopFilter(true, streams.stream, ENGLISH_STOP_WORDS_SET);
-            streams.stream = new CustomFilter(streams.stream);
-            streams.stream = new PorterStemFilter(streams.stream);
-            streams.stream = new PorterStemFilter(streams.stream);
-            streams.stream = new PorterStemFilter(streams.stream);
-        } else {
-            try {
-				streams.tokenizer.reset(reader);
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-        }
-
-        return streams.stream;
-    }
-
-    private class SavedStreams {
-        Tokenizer tokenizer;
-        TokenStream stream;
-    }
-
     public TokenStream tokenStream(
         String fieldName, Reader reader) {
 
@@ -112,4 +73,20 @@ public class WikipediaAnalyzer extends Analyzer {
 
         return stream;
     }
+
+    public TokenStream tokenStreamNoStemming(
+            String fieldName, Reader reader) {
+
+            // Tokenizer tokenizer = new LetterTokenizer(reader);
+        	Tokenizer tokenizer = new CustomTokenizer(reader);
+
+            TokenStream stream = new StandardFilter(tokenizer);
+            stream = new LengthFilter(stream, 3, 100);
+            stream = new LowerCaseFilter(stream);
+            // stream = new StopFilter(true, stream, StopAnalyzer.ENGLISH_STOP_WORDS_SET);
+            stream = new StopFilter(true, stream, ENGLISH_STOP_WORDS_SET);
+            stream = new CustomFilter(stream);
+
+            return stream;
+        }
 }

@@ -2,9 +2,11 @@ package edu.wiki.util;
 
 import gnu.trove.THashMap;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
@@ -26,8 +28,8 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	private final String query;
 	private PreparedStatement pstmt;
 
-	private int maxCacheEntries = 250000;
-	private int maxCacheNonExistingEntries = 500000;
+	private int maxCacheEntries = 50000;
+	private int maxCacheNonExistingEntries = 100000;
 	private int maxSelectGrouping = 100;
 
 	private long cache_hits = 0;
@@ -100,7 +102,7 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 				}
 			} else {
 				if (getAllLoadedMode()) {
-					break;
+					continue;
 				}
 				// if not in cache, and not allLoadedMode, do query
 				setKeyInPstmt(pstmt, count % maxSelectGrouping + 1, key);
@@ -242,24 +244,24 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 		}
 		setAllLoadedMode();
 		cache.clear();
-		PreparedStatement pstmtLoadAll;
+		Statement stmtLoadAll;
 		try {
-			pstmtLoadAll = WikiprepESAdb.getInstance().getConnection()
-					.prepareStatement(getLoadAllQuery());
+			stmtLoadAll = WikiprepESAdb.getInstance().getConnection().createStatement(java.sql.ResultSet.TYPE_FORWARD_ONLY, java.sql.ResultSet.CONCUR_READ_ONLY);
+			stmtLoadAll.setFetchSize(Integer.MIN_VALUE);
 		} catch (SQLException e1) {
 			throw new RuntimeException(e1);
 		}
 		ResultSet rs = null;
 		try {
-	        pstmtLoadAll.execute();
-	        rs = pstmtLoadAll.getResultSet();
+			stmtLoadAll.execute(getLoadAllQuery());
+	        rs = stmtLoadAll.getResultSet();
 	        while(rs.next()) {
 	        	K k = getKeyFromRs(rs);
 	        	V v = getValueFromRs(rs, cache.get(k));
 	        	addToCache(k, v);
 	        }
 	        rs.close();
-	        pstmtLoadAll.close();
+	        stmtLoadAll.close();
 		}catch(SQLException e) {
 	      //  rs.close();
 	      //  pstmtLoadAll.close();
@@ -269,10 +271,26 @@ public abstract class AbstractDBQueryOptimizer<K extends Comparable<K>, V> {
 	}
 	
 	public void forEach(BiConsumer<K,V> consumer) {
-		if (!getAllLoadedMode()){
-			throw new RuntimeException("forEach only supported in allLoaded mode");
+		if (getAllLoadedMode()){
+			cache.forEach(consumer);
+		}else{
+			try{
+				// We do it in a new conncetion so we don't interrupt the main
+				// conncetion
+				Connection connection = WikiprepESAdb.getNewConnection();
+				Statement stmt = connection.createStatement(java.sql.ResultSet.TYPE_FORWARD_ONLY, java.sql.ResultSet.CONCUR_READ_ONLY);
+				stmt.setFetchSize(Integer.MIN_VALUE);
+				stmt.execute(getLoadAllQuery());
+				ResultSet rs = stmt.getResultSet();
+				while(rs.next()) {
+					consumer.accept(getKeyFromRs(rs), getValueFromRs(rs, null));
+				}
+				stmt.close();
+				connection.close();
+			}catch(SQLException e){
+				throw new RuntimeException(e);
+			}
 		}
-		cache.forEach(consumer);
 	}
 	
 	private void setAllLoadedMode() {

@@ -20,9 +20,9 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 
 	public static final int LARGE_WINDOW_OF_WORDS_WIDTH = 150;
 	public static final int WINDOW_OF_WORDS_WIDTH = 15;
-	public static final int CONCEPTS_PER_SHORT_CONTEXT = 2;
+	public static final int CONCEPTS_PER_SHORT_CONTEXT = 10;
 	public static final int CONCEPTS_PER_MED_CONTEXT = 10;
-	public static final int CONCEPTS_PER_LONG_CONTEXT = 25;
+	public static final int CONCEPTS_PER_LONG_CONTEXT = 10;
 	
 	public ESAMultiResolutionSearcher() {
 		super();
@@ -40,10 +40,12 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 			getConceptVectorUsingMultiResolutionInternal(paragraph, use2ndOrder, CONCEPTS_PER_MED_CONTEXT, result);
 		});
 
-		// get concepts from analyzing window of words contexts (within paragraphs)
-		WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
-			getConceptVectorUsingMultiResolutionInternal(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
-		});
+		if(useShortContexts){
+			// get concepts from analyzing window of words contexts (within paragraphs)
+			WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
+				getConceptVectorUsingMultiResolutionInternal(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
+			});
+		}
 		
 		// build final vector
 		IConceptVector vec = new TroveConceptVector(result.size());
@@ -60,19 +62,14 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		TIntDoubleHashMap result = new TIntDoubleHashMap();
 		
 		// get concepts from analyzing entire doc
-		getConceptVectorUsingMultiResolutionInternal2(doc, use2ndOrder, CONCEPTS_PER_LONG_CONTEXT, result);
+		getConceptVectorUsingMultiResolutionInternal(doc, use2ndOrder, 50, result);
 
-		// get concepts from analyzing paragraphs (approximated by using large window of words contexts)
-		Collection<String> paragraphs = WikiprepESAUtils.getWindowOfWordsContexts(Arrays.asList(doc), LARGE_WINDOW_OF_WORDS_WIDTH, 0);
+		// get concepts from analyzing words
+		Collection<String> paragraphs = WikiprepESAUtils.getWindowOfWordsContexts(Arrays.asList(doc), 1, 0);
 		paragraphs.forEach((paragraph) -> {
-			getConceptVectorUsingMultiResolutionInternal2(paragraph, use2ndOrder, CONCEPTS_PER_MED_CONTEXT, result);
+			getConceptVectorUsingMultiResolutionInternal(paragraph, use2ndOrder, 20, result);
 		});
 
-		// get concepts from analyzing window of words contexts (within paragraphs)
-		WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
-			getConceptVectorUsingMultiResolutionInternal2(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
-		});
-		
 		// build final vector
 		IConceptVector vec = new TroveConceptVector(result.size());
 		TIntDoubleIterator iter = result.iterator();
@@ -84,22 +81,31 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 		return vec;
 	}
 
-	public IConceptVector getConceptVectorUsingMultiResolutionForWikipedia(String doc, int conceptsLimit, boolean use2ndOrder, boolean useShortContexts) {
+
+	public IConceptVector getConceptVectorUsingMultiResolutionForWikipedia(String doc, int conceptsLimit, boolean use2ndOrder, boolean useParagraphContexts, boolean useShortContexts) {
 		TIntDoubleHashMap result = new TIntDoubleHashMap();
 		
 		// get concepts from analyzing entire doc
 		getConceptVectorUsingMultiResolutionInternal(doc, use2ndOrder, CONCEPTS_PER_LONG_CONTEXT, result);
 
-		// get concepts from analyzing individual paragraph contexts
-		Collection<String> paragraphs = WikiprepESAUtils.getWikipediaDocumentParagraph(doc);
-		paragraphs.forEach((paragraph) -> {
-			getConceptVectorUsingMultiResolutionInternal(paragraph, use2ndOrder, CONCEPTS_PER_MED_CONTEXT, result);
-		});
+		Collection<String> paragraphs = null;
+		if(useParagraphContexts){
+			paragraphs = WikiprepESAUtils.getWikipediaDocumentParagraph(doc);
+			// get concepts from analyzing individual paragraph contexts
+			paragraphs.forEach((paragraph) -> {
+				getConceptVectorUsingMultiResolutionInternal(paragraph, use2ndOrder, CONCEPTS_PER_MED_CONTEXT, result);
+			});
+		}
 
-		// get concepts from analyzing window of words contexts (within paragraphs
-		WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
-			getConceptVectorUsingMultiResolutionInternal(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
-		});
+		if(useShortContexts){
+			if (paragraphs == null){
+				paragraphs = WikiprepESAUtils.getWikipediaDocumentParagraph(doc);
+			}
+			// get concepts from analyzing window of words contexts (within paragraphs
+			WikiprepESAUtils.getWindowOfWordsContexts(paragraphs, WINDOW_OF_WORDS_WIDTH, 0).forEach((wow) -> {
+				getConceptVectorUsingMultiResolutionInternal(wow, use2ndOrder, CONCEPTS_PER_SHORT_CONTEXT, result);
+			});
+		}
 		
 		// build final vector
 		IConceptVector vec = new TroveConceptVector(result.size());
@@ -119,38 +125,13 @@ public class ESAMultiResolutionSearcher extends ESASearcher {
 			TIntDoubleHashMap result) {
 		IConceptVector v = use2ndOrder ? 
 				getCombinedVector(context, maxConcepts) : 
-				getNormalVector(context, maxConcepts);
+				getConceptVectorUsingArray(context);
 		
 		if (v == null || v.size() == 0) {
 			return;
 		}
 		
-		IConceptIterator iter = v.bestKOrderedIterator(maxConcepts);
-		while (iter.next()) {
-			int conceptId = iter.getId();
-			double conceptScore = iter.getValue();
-			if (!result.containsKey(conceptId) ||
-					result.get(conceptId) < conceptScore) {
-				result.put(conceptId, conceptScore);
-			}
-		}
-	}
-	
-	private void getConceptVectorUsingMultiResolutionInternal2(
-			String context, 
-			boolean use2ndOrder, 
-			int maxConcepts,
-			TIntDoubleHashMap result) {
-		IConceptVector v = getConceptVector2(context);
-		v = use2ndOrder ? 
-				getCombinedVector(v, maxConcepts) : 
-				getNormalVector(v, maxConcepts);
-		
-		if (v == null || v.size() == 0) {
-			return;
-		}
-		
-		IConceptIterator iter = v.bestKOrderedIterator(maxConcepts);
+  		IConceptIterator iter = v.bestKOrderedIterator(maxConcepts);
 		while (iter.next()) {
 			int conceptId = iter.getId();
 			double conceptScore = iter.getValue();

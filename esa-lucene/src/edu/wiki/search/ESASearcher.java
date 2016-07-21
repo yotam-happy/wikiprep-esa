@@ -2,12 +2,12 @@ package edu.wiki.search;
 
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiConsumer;
 
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.TermAttribute;
@@ -19,15 +19,12 @@ import edu.wiki.concept.TroveConceptVector;
 import edu.wiki.index.WikipediaAnalyzer;
 import edu.wiki.util.InplaceSorts;
 import edu.wiki.util.TermVectorIterator;
-import edu.wiki.util.db.ArticleLengthQueryOptimizer;
 import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.ConceptESAVectorQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
 import gnu.trove.THashMap;
 import gnu.trove.THashSet;
 import gnu.trove.TIntDoubleHashMap;
-import gnu.trove.TIntDoubleIterator;
-import gnu.trove.TObjectIntHashMap;
 
 /**
  * Performs search on the index located in database.
@@ -43,262 +40,81 @@ public class ESASearcher {
 		analyzer = new WikipediaAnalyzer();
 	}
 	
+	public IConceptVector getConceptVector(String query) {
+        IConceptVector newCv = new TroveConceptVector(30);
+        getConceptVectorInternal(query, (id,s)->newCv.add(id, s));
+        return newCv;
+	}
+	
+	double[] tmpArray = null;
+	static final int tmpArraySize = 1500000;
+	public IConceptVector getConceptVectorUsingArray(String query) {
+		if(tmpArray == null){
+			tmpArray = new double[tmpArraySize];
+		}else{
+			Arrays.fill(tmpArray, 0);
+		}
+        getConceptVectorInternal(query, (id,s)->tmpArray[id]+= s);
+
+        IConceptVector newCv = new TroveConceptVector(30);
+        for(int i = 0; i < tmpArraySize; i++){
+        	if(tmpArray[i] > 0.000001){
+        		newCv.set(i, tmpArray[i]);
+        	}
+        }
+        return newCv;
+	}
+	
+	public HashMap<String,Integer> getBOW(String query, boolean stemming){
+		HashMap<String,Integer> bow = new HashMap<>();
+		String strTerm;
+        TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
+        try {
+			ts.reset();
+	        while (ts.incrementToken()) { 
+	            TermAttribute t = ts.getAttribute(TermAttribute.class);
+	            strTerm = t.term();
+	            // records term counts for TF
+	            Integer v = bow.get(strTerm);
+	            v = (v == null ? 1 : v +1);
+            	bow.put(strTerm, 1);
+	        }
+	                
+	        ts.end();
+	        ts.close();
+		} catch (IOException e1) {
+			throw new RuntimeException(e1);
+		}
+        return bow;
+	}
+	
 	/**
 	 * Retrieves full vector for regular features
 	 * @param query
 	 * @return Returns concept vector results exist, otherwise null 
 	 */
-	public IConceptVector getConceptVector(String query) {
-		int numTerms = 0;
-		TObjectIntHashMap<String> freqMap = new TObjectIntHashMap<String>();
-//		TObjectDoubleHashMap<String> tfidfMap = new TObjectDoubleHashMap<String>();
-		
-		ArrayList<String> termList = new ArrayList<String>(30);
-//		double vdouble;
-//		double tf;
-//		double vsum;
-		int vint;
-		numTerms = 0;
-		String strTerm;
-        TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
-        try {
-			ts.reset();
-	        while (ts.incrementToken()) { 
-	            TermAttribute t = ts.getAttribute(TermAttribute.class);
-	            strTerm = t.term();
-	            // records term counts for TF
-	            if(freqMap.containsKey(strTerm)){
-	            	vint = freqMap.get(strTerm);
-	            	freqMap.put(strTerm, vint+1);
-	            }
-	            else {
-	            	freqMap.put(strTerm, 1);
-	            }
-	            termList.add(strTerm);
-	            numTerms++;	
-	        }
-	                
-	        ts.end();
-	        ts.close();
-		} catch (IOException e1) {
-			throw new RuntimeException(e1);
-		}
-        
-        if(numTerms == 0){
-        	return null;
+	public void getConceptVectorInternal(String query, BiConsumer<Integer,Double> consumer) {
+
+		HashMap<String,Integer> bow = getBOW(query, true);
+        if(bow.size() == 0){
+        	return;
         }
-
-//    	Map<String, Float> idfMap = IdfQueryOptimizer.getInstance()
-//    			.doQuery(new HashSet<String>(termList));
-
-        // calculate TF-IDF vector (normalized)
-//        vsum = 0;
-//        for(String tk : idfMap.keySet()){
-//        	tf = 1.0 + Math.log(freqMap.get(tk));
-//        	vdouble = (idfMap.get(tk) * tf);
-//        	tfidfMap.put(tk, vdouble);
-//        	vsum += vdouble * vdouble;
-//        }
-//        vsum = Math.sqrt(vsum);
-        
-        
-        // comment this out for canceling query normalization
-        //for(String tk : idfMap.keySet()){
-        //	vdouble = tfidfMap.get(tk);
-        //	tfidfMap.put(tk, vdouble / vsum);
-        //}
        
-        TIntDoubleHashMap result = new TIntDoubleHashMap();  
-
         THashMap<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
-        		.doQuery(new HashSet<String>(termList));
+        		.doQuery(bow.keySet());
 
+        int nTerms = bow.size();
         termVectors.forEach((k,v) -> {
         	try {
             	TermVectorIterator iter = new TermVectorIterator(v);
-            	double termTfidf = freqMap.get(k);
+            	double termFreq = bow.get(k);
 				while (iter.next()) {
-					int doc = iter.getConceptId();
-					double score = iter.getConceptScore() * termTfidf + result.get(doc);
-					if (score != 0) {
-						result.put(iter.getConceptId(), score);
-					}
+					consumer.accept(iter.getConceptId(), iter.getConceptScore() * termFreq / nTerms);
 				}
 			} catch (Exception e) {
 				throw new RuntimeException(e);
 			}
         });
-        
-        // no result
-        if(result.size() == 0){
-        	return null;
-        }
-
-        
-        IConceptVector newCv = new TroveConceptVector(result.size());
-        TIntDoubleIterator iter = result.iterator();
-        while(iter.hasNext()) {
-        	iter.advance();
-			newCv.set( iter.key(), iter.value() / numTerms );
-        }
-		return newCv;
-	}
-
-	private double linearTransform(double x, double domainLow, double domainHigh){
-		return x < domainLow ? 0 : 
-			(x > domainHigh ? 1 : 
-				(x - domainLow) / (domainHigh - domainLow));
-	}
-	private double linearTransform(double x, 
-			double domainLow, double domainHigh,
-			double targetHigh, double targetLow){
-		return linearTransform(x, domainLow, domainHigh) * (targetHigh - targetLow) + targetLow;
-	}
-	
-	/**
-	 * Retrieves full vector for regular features where we give a bonus
-	 * to a concept if more then one word scores it.
-	 * The bonus is dependant on semantic distance of the words that scored
-	 * a concept where the words are less semantically related gets a bigger bonus 
-	 * 
-	 * @param query
-	 * @return Returns concept vector results exist, otherwise null 
-	 */
-	public IConceptVector getConceptVector2(String query) {
-		int numTerms = 0;
-		TObjectIntHashMap<String> freqMap = new TObjectIntHashMap<String>();
-		
-		ArrayList<String> termList = new ArrayList<String>(30);
-
-		int vint;
-		numTerms = 0;
-		String strTerm;
-        TokenStream ts = analyzer.tokenStream("contents",new StringReader(query));
-        try {
-			ts.reset();
-	        while (ts.incrementToken()) { 
-	            TermAttribute t = ts.getAttribute(TermAttribute.class);
-	            strTerm = t.term();
-	            // records term counts for TF
-	            if(freqMap.containsKey(strTerm)){
-	            	vint = freqMap.get(strTerm);
-	            	freqMap.put(strTerm, vint+1);
-	            }
-	            else {
-	            	freqMap.put(strTerm, 1);
-	            }
-	            termList.add(strTerm);
-	            numTerms++;	
-	        }
-	                
-	        ts.end();
-	        ts.close();
-		} catch (IOException e1) {
-			throw new RuntimeException(e1);
-		}
-        
-        if(numTerms == 0){
-        	return null;
-        }
-
-		Map<Integer, Map<String,Double>> conceptTerm = new HashMap<>();
-
-       
-        TIntDoubleHashMap result = new TIntDoubleHashMap();  
-
-        THashMap<String,byte[]> termVectors = TermQueryOptimizer.getInstance()
-        		.doQuery(new HashSet<String>(termList));
-        
-        termVectors.forEach((k,v) -> {
-        	try {
-            	TermVectorIterator iter = new TermVectorIterator(v);
-            	double termTfidf = freqMap.get(k);
-				while (iter.next()) {
-					int doc = iter.getConceptId();
-					double score = iter.getConceptScore() * termTfidf + result.get(doc);
-					if (score != 0) {
-						result.put(iter.getConceptId(), score);
-					}
-
-					if(!conceptTerm.containsKey(doc)){
-						conceptTerm.put(doc, new HashMap<>());
-					}
-					conceptTerm.get(doc).put(k, iter.getConceptScore() * termTfidf);
-				}
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-        });
-
-        TIntDoubleIterator it = result.iterator();
-        while(it.hasNext()){
-        	it.advance();
-        	int concept = it.key();
-        	if(!conceptTerm.containsKey(concept)){
-        		continue;
-        	}
-        	
-        	// accumulates distances between terms,
-        	// we assume that far away terms mean the terms cover the document better
-/*        	double termCoverage = 0;
-    		Map<String,Double> tl = new HashMap<>(conceptTerm.get(concept));
-    		double sampleRate = tl.size() < 7 ? 1.0 : 30 / (tl.size() * (tl.size() - 1)) ;
-        	for(Entry<String,Double> t1 : conceptTerm.get(concept).entrySet()){
-            	for(Entry<String,Double> t2 : tl.entrySet()){
-            		
-            		if(t1.getKey().compareTo(t2.getKey()) <= 0){
-            			continue;
-            		}
-            		if (Math.random() > sampleRate){
-            			continue;
-            		}
-            		termCoverage += getTermSimilarity(t1.getKey(),t2.getKey());
-            	}
-        	}*/
-        	double termCoverage = conceptTerm.get(concept).size();
-        	
-        	
-        	final double goodCoverageThreshhold = 2;
-        	final double badCoverageThreshhold = 1;
-        	final double trustedArticleLengthThreshhold = 1000;
-        	final double untrustedArticleLenghThreshhold = 200;
-        	final double maxTrustFactor = 1;
-        	final double NoTrustFactor = 0.3;
-        	
-        	double coverage = linearTransform(termCoverage, badCoverageThreshhold, goodCoverageThreshhold); 
-        			
-        	// get article lengths
-        	double articleLen = ArticleLengthQueryOptimizer.getInstance().doQuery(concept);
-        	
-        	double trust = linearTransform(articleLen, 
-        			untrustedArticleLenghThreshhold, 
-        			trustedArticleLengthThreshhold); 
-        	
-        	// we penalize short articles unless they have high termCoverage.
-        	// the idea is that we require more evidence for short articles before
-        	// we give them high scores
-        	double trustPenaltyFactor = (1-trust)*(1-coverage);
-        	double trustPenalty = linearTransform(trustPenaltyFactor, 0, 1, NoTrustFactor, maxTrustFactor); 
-        	
-        	// we give a bonus to concepts with high coverage.
-        	double coverageBonus = termCoverage;
-        	
-        	it.setValue(it.value() * (1 + coverageBonus) * trustPenalty);
-        }
-        
-        // no result
-        if(result.size() == 0){
-        	return null;
-        }
-
-        
-        IConceptVector newCv = new TroveConceptVector(result.size());
-        TIntDoubleIterator iter = result.iterator();
-        while(iter.hasNext()) {
-        	iter.advance();
-			newCv.set( iter.key(), iter.value() / numTerms );
-        }
-		return newCv;
 	}
 
 	public IConceptVector getNormalVector(String query, int maxVectorLen) {
@@ -403,11 +219,6 @@ public class ESASearcher {
 	 */
 	public IConceptVector getCombinedVector(String query, int maxVectorLen) {
 		IConceptVector cvBase = getConceptVector(query);
-		return getCombinedVector(cvBase, maxVectorLen);
-	}
-
-	public IConceptVector getCombinedVector2(String query, int maxVectorLen) {
-		IConceptVector cvBase = getConceptVector2(query);
 		return getCombinedVector(cvBase, maxVectorLen);
 	}
 

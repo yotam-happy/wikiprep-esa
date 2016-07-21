@@ -9,6 +9,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -24,7 +25,6 @@ import edu.wiki.api.concept.IConceptVector;
 import edu.wiki.search.ESAMultiResolutionSearcher;
 import edu.wiki.util.Tuple;
 import edu.wiki.util.WikiprepESAdb;
-import edu.wiki.util.db.Concept2ndOrderQueryOptimizer;
 import edu.wiki.util.db.IdfQueryOptimizer;
 import edu.wiki.util.db.TermQueryOptimizer;
 
@@ -44,8 +44,8 @@ public class ESAAnalyzeSelf {
 		}
 	}
 	
-	static int THREADS = 4;
-	static int BATCH_SIZE = 10;
+	static int THREADS = 8;
+	static int BATCH_SIZE = 5;
 	static int MAX_TERMS_PER_VECTOR = 1000;
 	static String strVectorInsert = "INSERT INTO concept_esa_vectors (id,vector) VALUES (?,?)";
 	
@@ -55,8 +55,8 @@ public class ESAAnalyzeSelf {
 		Init(baseFileName);
 		System.out.println("start working, saving result to tmp file...");
 
-		stmt = WikiprepESAdb.getInstance().getConnection()
-				.createStatement(java.sql.ResultSet.TYPE_FORWARD_ONLY, java.sql.ResultSet.CONCUR_READ_ONLY);
+		Connection connection = WikiprepESAdb.getNewConnection();
+		stmt = connection.createStatement(java.sql.ResultSet.TYPE_FORWARD_ONLY, java.sql.ResultSet.CONCUR_READ_ONLY);
 		stmt.setFetchSize(Integer.MIN_VALUE);
 		
 		int c = 0;
@@ -87,7 +87,7 @@ public class ESAAnalyzeSelf {
 			}
 			
 			// run k threads
-			tasks.parallelStream().forEach((task) -> {
+			tasks.stream().forEach((task) -> {
 				final FileOutputStream fos;
 				try {
 					ESAMultiResolutionSearcher searcher = new ESAMultiResolutionSearcher();
@@ -97,7 +97,7 @@ public class ESAAnalyzeSelf {
 					task.tuples.stream().forEach((tuple) -> {
 						try {
 							// Dont use second order....
-							IConceptVector vector = searcher.getConceptVectorUsingMultiResolutionForWikipedia(tuple.y, 1000, false, false);
+							IConceptVector vector = searcher.getConceptVectorUsingMultiResolutionForWikipedia(tuple.y, 1000, false, false, false);
 							
 							// write concept id
 							dos.writeInt(tuple.x);
@@ -136,6 +136,8 @@ public class ESAAnalyzeSelf {
 			System.out.println("articles transformed: " + c + ", avg: " + rate);
 		}
 		
+		stmt.close();
+		connection.close();
 		System.out.println("total articles transformed: " + c); 
 		Finish(baseFileName);
 		
@@ -143,7 +145,7 @@ public class ESAAnalyzeSelf {
 	
 	private static void Init(String baseFilename) {
 		System.out.println("in-memory cache tables...");
-		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
+//		Concept2ndOrderQueryOptimizer.getInstance().loadAll();
 		TermQueryOptimizer.getInstance().loadAll();
 		IdfQueryOptimizer.getInstance().loadAll();
 		

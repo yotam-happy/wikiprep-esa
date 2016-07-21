@@ -14,6 +14,10 @@ public class WikiprepESAdb {
 	Connection connection;
 
 	private WikiprepESAdb() {
+		connection = getNewConnection();
+	}
+	
+	public static Connection getNewConnection(){
 		String serverName = WikiprepESAConfiguration.getInstance().getProperty(
 				WikiprepESAConfiguration.SERVER_NAME);
 		String mydatabase = WikiprepESAConfiguration.getInstance().getProperty(
@@ -26,7 +30,7 @@ public class WikiprepESAdb {
 		// Create a connection to the database 
 		String url = "jdbc:mysql://" + serverName + "/" + mydatabase; // a JDBC url 
 		try {
-			connection = DriverManager.getConnection(url, username, password);
+			return DriverManager.getConnection(url, username, password);
 		} catch (SQLException e) {
 			throw new RuntimeException(e);
 		}

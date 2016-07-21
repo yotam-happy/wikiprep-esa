@@ -5,7 +5,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -13,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 
 import edu.clustering.jot.algorithms.AlgorithmConstructor;
 import edu.clustering.jot.interfaces.ClusteringAlgorithm;
@@ -33,13 +33,14 @@ public class ClustersBuilder {
 	static final int MAX_TERMS_PER_VECTOR = 1000;
 	static final int MAX_ITERATIONS = 20;
 	
-	ESASearcher searcher;
+	ESASearcher searcher = new ESASearcher();
 	ClusteringAlgorithm<ArrayListConceptVector> kMeans = null;
 	Map<Integer,Tuple<Integer,Double>> allMappings = null;
 	List<ArrayListConceptVector> vectors = null;
+	Consumer<BiConsumer<Integer,ArrayListConceptVector>> forEachVector;
 	
 	public ClustersBuilder(){
-		searcher = new ESASearcher();
+		forEachVector = forEachBOW;
 	}
 
 	public static void main(String[] args) {
@@ -63,7 +64,7 @@ public class ClustersBuilder {
 	public void buildClusters(int nClusters) {
 		
 		System.out.println("Donig KMeans clustering");
-		kMeans = AlgorithmConstructor.getKMeans(20, 0.00001);
+		kMeans = AlgorithmConstructor.getKMeansPlusPlus(20, 0.00001);
 		
 		kMeans.doClustering(nClusters, nClusters, vectors);
 		List<Cluster<ArrayListConceptVector>> clusters = kMeans.getClusters();
@@ -71,16 +72,8 @@ public class ClustersBuilder {
 		allMappings = new HashMap<>();
 		Counting counter = new Counting(10000, "Final mapping.");
 
-		forEachConcept((id,v)->{
-			IConceptVector vec;
-			try {
-				vec = searcher.getConceptESAVector(v);
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-			vec = ESASearcher.getNormalVector(vec, 350);
-			ArrayListConceptVector fastV = new ArrayListConceptVector(vec);
-			allMappings.put(id, classifyToClusters(fastV, clusters));
+		forEachVector.accept((id,v)->{
+			allMappings.put(id, classifyToClusters(v, clusters));
 			counter.addOne();
 		});
 	}
@@ -163,22 +156,12 @@ public class ClustersBuilder {
 		System.out.println("Loading concepts");
 		// Get all concept vectors
 		count = 0;
-		forEachConcept((id,v)->{
-			IConceptVector vec;
-			try {
-				vec = searcher.getConceptESAVector(v);
-			} catch (Exception e) {
-				throw new RuntimeException(e);
-			}
-			vec = ESASearcher.getNormalVector(vec, 250);
-			ArrayListConceptVector fastV = new ArrayListConceptVector(vec);
-			fastV.normalizeLength();
-			fastV.setId(id);
+		forEachVector.accept((id,vec)->{
 			
         	if (InlinkQueryOptimizer.getInstance().doQuery(id) < minInlinksToParticipate){
         		return;
         	}
-			vectors.add(fastV);
+			vectors.add(vec);
 			
 			count++;
 			if (count % 10000 == 0) {
@@ -191,32 +174,52 @@ public class ClustersBuilder {
 	public void setMinInlinksToParticipate(int minInlinksToParticipate){
 		this.minInlinksToParticipate = minInlinksToParticipate;
 	}
-	
-	public static void forEachConcept(BiConsumer<Integer,byte[]> consumer){
-		try{
-			Statement stmt = WikiprepESAdb.getInstance().getConnection()
-					.createStatement(java.sql.ResultSet.TYPE_FORWARD_ONLY, java.sql.ResultSet.CONCUR_READ_ONLY);
-			stmt.setFetchSize(Integer.MIN_VALUE);
-			ResultSet rs = null;
-			try {
-				stmt.execute(ConceptESAVectorQueryOptimizer.getInstance().getLoadAllQuery());
-		        rs = stmt.getResultSet();
-		        while(rs.next()) {
-		        	consumer.accept(rs.getInt(1), rs.getBytes(2));
-		        }
-		        rs.close();
-	        	stmt.close();
-			}catch(SQLException e) {
-				if(rs != null){
-					rs.close();
+
+	Consumer<BiConsumer<Integer,ArrayListConceptVector>> forEachESA = 
+		(consumer) ->{
+			ConceptESAVectorQueryOptimizer.getInstance().forEach((id,v)->{
+				IConceptVector vec;
+				try {
+					vec = searcher.getConceptESAVector(v);
+				} catch (Exception e) {
+					throw new RuntimeException(e);
 				}
-		        if (stmt != null) {
-		        	stmt.close();
-		        }
-				throw new RuntimeException(e);
-			}
-		}catch(SQLException e){
-			throw new RuntimeException(e);
-		}
-	}
+				vec = ESASearcher.getNormalVector(vec, 250);
+				ArrayListConceptVector fastV = new ArrayListConceptVector(vec);
+				fastV.setId(id);
+				
+				consumer.accept(id, fastV);
+			});
+		};
+	Consumer<BiConsumer<Integer,ArrayListConceptVector>> forEachBOW = 
+		(consumer) ->{
+			Map<String,Integer> termIdMap = new HashMap<>();
+			WikiprepESAdb.getInstance().forEachResult("SELECT old_id, old_text FROM text", (rs)->{
+				try {
+					String text = new String(rs.getBytes(2), "UTF-8");
+					int conceptId = rs.getInt(1);
+					
+					HashMap<String,Integer> bow = searcher.getBOW(text, true);
+					double nTerms = bow.values().stream().mapToDouble((x)->x).sum();
+
+					HashMap<Integer,Double> v = new HashMap<>();
+					bow.forEach((term,termCount)->{
+						Integer termId = termIdMap.get(term);
+						if(termId == null){
+							termId = termIdMap.size();
+							termIdMap.put(term, termId);
+						}
+						v.put(termId, (double)termCount / nTerms);
+					});
+					
+					ArrayListConceptVector fastV = new ArrayListConceptVector(v.size());
+					v.forEach((termId,tf)->fastV.add(termId,tf));
+					fastV.setId(conceptId);
+					
+					consumer.accept(conceptId, fastV);
+				} catch (Exception e) {
+					throw new RuntimeException(e);
+				}
+			});
+		};				
 }

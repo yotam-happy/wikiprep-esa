@@ -21,7 +21,7 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 	
 	@Override
 	public void add(int key, double d) {
-		valueMap.put( key, valueMap.get( key ) + d );
+		valueMap.adjustOrPutValue(key, d, d);
 	}
 
 	@Override
@@ -133,7 +133,7 @@ public class TroveConceptVector implements IConceptVector, Serializable {
 	}
 
 	@Override
-	public void multipty(Float c) {
+	public void multipty(double c) {
 		// TODO Auto-generated method stub
 		TIntDoubleIterator iter = valueMap.iterator();
 		while(iter.hasNext()){

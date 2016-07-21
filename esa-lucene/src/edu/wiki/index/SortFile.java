@@ -12,16 +12,24 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 
 import edu.wiki.util.counting.Counting;
 
 public class SortFile implements Comparator<String>{
 	File f;
 	File fout;
+	boolean random = false;
+	Random rnd = new Random();
 	int maxMem =  250 * 1024 * 1024; // use 250M in memory
+	
 	public SortFile(String fname, String foutname){
 		f = new File(fname);
 		fout = new File(foutname);
+	}
+	public SortFile(String fname, String foutname, boolean random){
+		this(fname,foutname);
+		this.random = random;
 	}
 	
 	public void sort() throws IOException{
@@ -78,14 +86,26 @@ public class SortFile implements Comparator<String>{
 			String first = null;
 			int j = -1;
 			
-			for(int i = 0; i < qs.size(); i++){
-				if(!qs.get(i).isEmpty() && 
-						(first == null || compare(first,qs.get(i).peek()) > 0)){
-					first = qs.get(i).peek();
-					j = i;
+			if(random){
+				int i = rnd.nextInt(qs.size());
+				while(qs.get(i).isEmpty()){
+					i = rnd.nextInt(qs.size());
+				}
+				j = i;
+				first = qs.get(i).peek();
+			}else{
+				for(int i = 0; i < qs.size(); i++){
+					if(!qs.get(i).isEmpty() && 
+							(first == null || compare(first,qs.get(i).peek()) > 0)){
+						first = qs.get(i).peek();
+						j = i;
+					}
 				}
 			}
-			qs.get(j).poll();
+			
+			if (j != -1){
+				qs.get(j).poll();
+			}
 			
 			if (j != -1 && qs.get(j).isEmpty() && readers.get(j) != null){
 				if(fillQueue(qs.get(j), readers.get(j), maxMem / tmp.size())){
@@ -134,7 +154,13 @@ public class SortFile implements Comparator<String>{
 	}
 	@SuppressWarnings("resource")
 	private File sortIntoFile(List<String> l) throws IOException{
-		Collections.sort(l,this);
+
+		if(random){
+			Collections.shuffle(l,rnd);
+		}else{
+			Collections.sort(l,this);
+		}
+		
 		File f = File.createTempFile("myindexer", ".tmp");
 		FileWriter w = new FileWriter(f);
 		l.forEach((s)->{

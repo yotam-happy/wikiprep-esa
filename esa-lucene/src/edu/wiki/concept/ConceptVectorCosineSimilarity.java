@@ -58,6 +58,11 @@ public class ConceptVectorCosineSimilarity {
 		}
 
 		d = d / (Math.sqrt(norm1) * Math.sqrt(norm2));
+
+		// Seems to be some numerical issues, sometimes d = 1.00000000001
+		if(d > 1.0){
+			d = 1.0;
+		}
 		
 		return d;
 	}

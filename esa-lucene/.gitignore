@@ -1,2 +1,3 @@
 /bin/
 wikiprep-esa.config
+!lib/*.jar

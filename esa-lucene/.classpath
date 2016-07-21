@@ -8,5 +8,6 @@
 	<classpathentry kind="lib" path="web/WEB-INF/lib/trove-2.1.0.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="C:/EclipseWorkspace/javaml-0.1.7/javaml-0.1.7.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/JotClustering"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
